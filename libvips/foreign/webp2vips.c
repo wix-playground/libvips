@@ -363,6 +363,10 @@ read_new( VipsSource *source, int page, int n, double scale )
 	read->config.options.use_threads = 1;
 	read->config.output.is_external_memory = 1;
 
+	/* Block sources larger than 20MB being read into memory.
+	 */
+	g_object_set( source, "pipe_read_limit", 20 * 1024 * 1024, NULL );
+
 	if( !(read->data.bytes = 
 		vips_source_map( source, &read->data.size )) ) {
 		read_free( read );

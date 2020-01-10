@@ -174,6 +174,10 @@ typedef struct _VipsSource {
 	void *mmap_baseaddr;
 	size_t mmap_length;
 
+	/* A configurable limit on the maximum length of a pipe when forcing
+	 * it into memory. Set this low to prevent DoS attacks. Default 1gb.
+	 */
+	int pipe_read_limit;
 } VipsSource;
 
 typedef struct _VipsSourceClass {

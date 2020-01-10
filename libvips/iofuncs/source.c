@@ -87,7 +87,7 @@
 G_DEFINE_TYPE( VipsSource, vips_source, VIPS_TYPE_CONNECTION );
 
 /* We can't test for seekability or length during _build, since the read and 
- * seek signal handlers may not have been connected yet. Instead, we test 
+ * seek signal handlers might not have been connected yet. Instead, we test 
  * when we first need to know.
  */
 static int
@@ -184,6 +184,9 @@ vips_source_sanity( VipsSource *source )
 		g_assert( source->length == -1 );
 	}
 	else {
+		/* Something like a seekable file.
+		 */
+
 		/* After we're done with the header, the sniff buffer should
 		 * be gone.
 		 */
@@ -330,6 +333,13 @@ vips_source_class_init( VipsSourceClass *class )
 		G_STRUCT_OFFSET( VipsSource, blob ),
 		VIPS_TYPE_BLOB );
 
+	VIPS_ARG_INT( class, "pipe_read_limit", 4, 
+		_( "Pipe read limit" ), 
+		_( "Length limit when pipes are forced into memory" ),
+		VIPS_ARGUMENT_INPUT,
+		G_STRUCT_OFFSET( VipsSource, pipe_read_limit ),
+		0, 1024 * 1024 * 1024, 1024 * 1024 * 1024 );
+
 }
 
 static void
@@ -338,6 +348,7 @@ vips_source_init( VipsSource *source )
 	source->length = -1;
 	source->sniff = g_byte_array_new();
 	source->header_bytes = g_byte_array_new();
+	source->pipe_read_limit = 1024 * 1024 * 1024;
 }
 
 /**
@@ -346,6 +357,14 @@ vips_source_init( VipsSource *source )
  *
  * Create an source attached to a file descriptor. @descriptor is 
  * closed with close() when source is finalized. 
+ *
+ * If this descriptor does not support mmap and the source is 
+ * used with a loader that can only work from memory, then the data will be
+ * automatically read into memory to EOF before the loader starts. This can
+ * produce high memory use if the descriptor represents a large object.
+ *
+ * Set @pipe_read_limit with g_object_set() to limit the size of object that 
+ * will be read in this way. The default is 1GB.
  *
  * Returns: a new source.
  */
@@ -715,19 +734,14 @@ vips_source_read( VipsSource *source, void *buffer, size_t length )
 	return( total_read );
 }
 
-/* -1 on a pipe isn't actually unbounded. Have a limit to prevent
- * huge sources accidentally filling memory.
- *
- * 1gb. Why not.
- */
-static const int vips_pipe_read_limit = 1024 * 1024 * 1024;
-
 /* Read to a position. -1 means read to end of source. Does not change 
  * read_position.
  */
 static int
 vips_source_pipe_read_to_position( VipsSource *source, gint64 target )
 {
+	const char *nick = vips_connection_nick( VIPS_CONNECTION( source ) ); 
+
 	gint64 old_read_position;
 	unsigned char buffer[4096];
 
@@ -742,7 +756,7 @@ vips_source_pipe_read_to_position( VipsSource *source, gint64 target )
 		(target < 0 ||
 			(source->length != -1 && 
 			 target > source->length)) ) {
-		vips_error( vips_connection_nick( VIPS_CONNECTION( source ) ), 
+		vips_error( nick, 
 			_( "bad read to %" G_GINT64_FORMAT ), target );
 		return( -1 );
 	}
@@ -760,9 +774,8 @@ vips_source_pipe_read_to_position( VipsSource *source, gint64 target )
 			break;
 
 		if( target == -1 &&
-			source->read_position > vips_pipe_read_limit ) {
-			vips_error( vips_connection_nick( VIPS_CONNECTION( source ) ), 
-				"%s", _( "pipe too long" ) );
+			source->read_position > source->pipe_read_limit ) {
+			vips_error( nick, "%s", _( "pipe too long" ) );
 			return( -1 );
 		}
 	}

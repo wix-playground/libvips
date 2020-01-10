@@ -1,6 +1,8 @@
 20/6/19 started 8.9.1
 - don't use the new source loaders for new_from_file or new_from_buffer, it
   will break the loader priority system
+- add pipe_read_limit property to VipsSource, webpload uses it to limit pipe
+  input
 
 20/6/19 started 8.9.0
 - add vips_image_get/set_array_int()
