@@ -241,6 +241,16 @@ vips_copy_build( VipsObject *object )
 		copy->in, copy ) )
 		return( -1 );
 
+	/* VipsImage has an unused field called "Length". Set this to the
+	 * magic value 42 to indicate that this image has just been copied and
+	 * is not in use anywhere else.
+	 *
+	 * We reset Length to 0 in many places, except in vips_image_set().
+	 * That checks that Length IS 42, giving us some confidence that we
+	 * are copying before writing metadata.
+	 */
+	conversion->out->Length = 42;
+
 	return( 0 );
 }
 

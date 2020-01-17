@@ -1026,6 +1026,15 @@ vips_image_set( VipsImage *image, const char *name, GValue *value )
                 return;
         }
 
+	/* vips_copy() sets this unused field to "42". Check this to try to
+	 * ensure copy has been called before set.
+	 */
+	if( image->Length != 42 ) {
+                g_warning( "attempt to set metadata \"%s\" without copy()", 
+			name );
+                return;
+	}
+
 	meta_init( image );
 	(void) meta_new( image, name, value );
 
