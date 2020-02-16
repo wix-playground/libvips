@@ -259,8 +259,8 @@ class TestForeign:
         im = pyvips.Image.new_from_file(JPEG_FILE)
 
         # higher Q should mean a bigger buffer
-        b1 = im.heifsave_buffer(Q=10)
-        b2 = im.heifsave_buffer(Q=90)
+        b1 = im.jpegsave_buffer(Q=10)
+        b2 = im.jpegsave_buffer(Q=90)
         assert len(b2) > len(b1)
 
         # higher subsampling should result in smaller buffer
