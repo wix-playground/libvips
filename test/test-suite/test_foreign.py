@@ -263,7 +263,7 @@ class TestForeign:
         b2 = im.jpegsave_buffer(Q=90)
         assert len(b2) > len(b1)
 
-        # higher subsampling should result in smaller buffer
+        # force subsampling should result in smaller buffer
         b1 = im.jpegsave_buffer(Q=90, force_subsample=True)
         b2 = im.jpegsave_buffer(Q=90)
         assert len(b2) > len(b1)
