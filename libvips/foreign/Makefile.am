@@ -2,6 +2,7 @@ noinst_LTLIBRARIES = libforeign.la
 
 libforeign_la_SOURCES = \
 	pforeign.h \
+	jpeg2000load.c \
 	heifload.c \
 	heifsave.c \
 	niftiload.c \

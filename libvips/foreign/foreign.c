@@ -2107,9 +2107,12 @@ vips_foreign_operation_init( void )
 
 	extern GType vips_foreign_load_gif_file_get_type( void ); 
 	extern GType vips_foreign_load_gif_buffer_get_type( void ); 
-	extern GType vips_foreign_load_gif_source_get_type( void ); 
+	extern GType vips_foreign_load_gif_source_get_type( void );
 
-	vips_foreign_load_csv_get_type(); 
+    extern GType vips_foreign_load_jpeg2000_file_get_type( void );
+    extern GType vips_foreign_load_jpeg2000_buffer_get_type( void );
+
+    vips_foreign_load_csv_get_type(); 
 	vips_foreign_save_csv_get_type(); 
 	vips_foreign_load_matrix_get_type(); 
 	vips_foreign_save_matrix_get_type(); 
@@ -2252,6 +2255,11 @@ vips_foreign_operation_init( void )
 	vips_foreign_save_heif_buffer_get_type(); 
 #endif /*HAVE_HEIF_ENCODER*/
 
-	vips__foreign_load_operation = 
+#ifdef HAVE_OPENJPEG
+    vips_foreign_load_jpeg2000_file_get_type();
+    vips_foreign_load_jpeg2000_buffer_get_type();
+#endif /*HAVE_OPENJPEG*/
+
+    vips__foreign_load_operation = 
 		g_quark_from_static_string( "vips-foreign-load-operation" ); 
 }

@@ -1,3 +1,4 @@
+.idea
 compile
 .pytest_cache
 a.out

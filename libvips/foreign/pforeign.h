@@ -239,6 +239,8 @@ extern const char *vips__heif_suffs[];
 struct heif_error;
 void vips__heif_error( struct heif_error *error );
 
+extern const char *vips__jpeg2000_suffs[];
+
 #ifdef __cplusplus
 }
 #endif /*__cplusplus*/

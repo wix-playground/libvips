@@ -51,9 +51,9 @@
 #include <vips/debug.h>
 #include <vips/internal.h>
 
-#ifdef HAVE_JPEG2000_DECODER
+#ifdef HAVE_OPENJPEG
 
-#include <openjpeg.h>
+#include <openjpeg-2.3/openjpeg.h>
 
 #include "pforeign.h"
 
@@ -127,7 +127,7 @@ vips_foreign_load_jpeg2000_dispose(GObject *gobject) {
             dispose(gobject);
 }
 
-void
+static void
 vips__jpeg2000_error(const char *fmt, const char *message) {
     vips_error("jpeg2000", fmt, message);
 }
@@ -147,17 +147,21 @@ vips_foreign_load_jpeg2000_format(const char *buf, int len) {
 }
 
 static int
-vips_foreign_load_jpeg2000_is_a(const char *buf, int len) {
+vips_foreign_load_jpeg2000_is_a(const char *buf, int len) 
+{
     return vips_foreign_load_jpeg2000_format(buf, len) > 0;
 }
 
 static VipsForeignFlags
-vips_foreign_load_jpeg2000_get_flags(VipsForeignLoad *load) {
+vips_foreign_load_jpeg2000_get_flags(VipsForeignLoad *load) 
+{
     return (VIPS_FOREIGN_SEQUENTIAL);
 }
 
 static int
-vips_foreign_load_jpeg2000_set_header(VipsForeignLoadJPEG2000 *jpeg2000, VipsImage *out) {
+vips_foreign_load_jpeg2000_set_header(VipsForeignLoadJPEG2000 *jpeg2000,
+        VipsImage *out) 
+{
     int bands;
 
     // todo: jpeg2000->has_alpha =
@@ -534,7 +538,7 @@ vips_foreign_load_jpeg2000_buffer_init(VipsForeignLoadJPEG2000Buffer *buffer)
 {
 }
 
-#endif /*HAVE_JPEG2000_DECODER*/
+#endif /*HAVE_OPENJPEG*/
 
 /**
  * vips_jpeg2000load:

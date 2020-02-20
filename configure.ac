@@ -1013,6 +1013,22 @@ if test x"$with_rsvg" != x"no"; then
   )
 fi
 
+# openjpeg
+AC_ARG_WITH([openjpeg], 
+  AS_HELP_STRING([--without-openjpeg], [build without openjpeg (default: test)]))
+
+if test x"$with_openjpeg" != x"no"; then
+  PKG_CHECK_MODULES(OPENJPEG, libopenjp2,
+    [AC_DEFINE(HAVE_OPENJPEG,1,[define if you have openjp2 >= 2.3.0 installed.])
+     with_openjpeg=yes
+     PACKAGES_USED="$PACKAGES_USED libopenjp2"
+    ],
+    [AC_MSG_WARN([openjp2 >= 2.3.0 not found; disabling JPEG2000 load via OpenJPEG])
+     with_openjpeg=no
+    ]
+  )
+fi
+
 # zlib
 # some platforms, like macosx, are missing the .pc files for zlib, so
 # we fall back to FIND_ZLIB
@@ -1415,6 +1431,7 @@ accelerate loops with orc: 		$with_orc
 ICC profile support with lcms: 		$with_lcms
 file import with niftiio: 		$with_nifti
 file import with libheif: 		$with_heif
+file import with OpenJPEG: 		$with_openjpeg
 file import with OpenEXR: 		$with_OpenEXR
 file import with OpenSlide:		$with_openslide
   (requires openslide-3.3.0 or later)
