@@ -53,7 +53,7 @@
 
 #ifdef HAVE_OPENJPEG
 
-#include <openjpeg-2.3/openjpeg.h>
+#include <openjpeg.h>
 
 #include "pforeign.h"
 
