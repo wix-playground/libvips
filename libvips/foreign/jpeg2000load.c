@@ -62,6 +62,7 @@
 #define J2K_CODESTREAM_MAGIC "\xff\x4f\xff\x51"
 #define J2K_CFMT 1
 #define JP2_CFMT 2
+#define JPT_CFMT 3
 
 #define VIPS_TYPE_FOREIGN_LOAD_JPEG2000 (vips_foreign_load_jpeg2000_get_type())
 #define VIPS_FOREIGN_LOAD_JPEG2000(obj) \
@@ -83,8 +84,6 @@ typedef struct _VipsForeignLoadJPEG2000 {
 
     gboolean has_alpha;
 
-    OPJ_COLOR_SPACE color_space;
-
     /* Size of image.
      */
     int width;
@@ -94,6 +93,7 @@ typedef struct _VipsForeignLoadJPEG2000 {
     opj_stream_t *read_stream;
     opj_codec_t *codec;
     opj_image_t *jpeg_image;
+    OPJ_COLOR_SPACE color_space;
 
 } VipsForeignLoadJPEG2000;
 
@@ -198,9 +198,28 @@ vips_foreign_load_jpeg2000_header(VipsForeignLoad *load) {
     VipsForeignLoadJPEG2000Class *jpeg2000_class =
             VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS(jpeg2000);
 
-    if (jpeg2000_class->open(jpeg2000))
+    if ( jpeg2000_class->open(jpeg2000) )
         return (-1);
 
+    switch (jpeg2000->decode_format) {
+        case J2K_CFMT: {
+            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_J2K);
+            break;
+        }
+        case JP2_CFMT: {
+            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_JP2);
+            break;
+        }
+        case JPT_CFMT: {
+            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_JPT);
+            break;
+        }
+        default:
+            vips__jpeg2000_error("failed to initialize codec %d", NULL);
+            vips_foreign_load_jpeg2000_close(jpeg2000);
+            return (-1);
+    }
+    
     /* Read the main header of the codestream and if necessary the JP2 boxes*/
     if (! opj_read_header(jpeg2000->read_stream, jpeg2000->codec, &jpeg2000->jpeg_image)) {
         vips__jpeg2000_error("failed to read the header", NULL);
@@ -258,30 +277,30 @@ vips_foreign_load_jpeg2000_generate(VipsRegion *or,
             return (-1);
     }
 
-    if (!jpeg2000->img) {
-        struct jpeg2000_decoding_options *options;
-        enum jpeg2000_chroma chroma = jpeg2000->has_alpha ?
-                                      jpeg2000_chroma_interleaved_RGBA :
-                                      jpeg2000_chroma_interleaved_RGB;
-
-        /* Only disable transforms if we have been able to fetch the
-         * untransformed dimensions.
-         */
-        options = jpeg2000_decoding_options_alloc();
-
-        error = jpeg2000_decode_image(jpeg2000->handle, &jpeg2000->img,
-                                      jpeg2000_colorspace_RGB, chroma,
-                                      options);
-        jpeg2000_decoding_options_free(options);
-        if (error.code) {
-            vips__jpeg2000_error(&error);
-            return (-1);
-        }
-    }
-
-    memcpy(VIPS_REGION_ADDR(or, 0, r->top),
-           jpeg2000->data + jpeg2000->stride * line,
-           VIPS_IMAGE_SIZEOF_LINE(or->im));
+//    if (!jpeg2000->img) {
+//        struct jpeg2000_decoding_options *options;
+//        enum jpeg2000_chroma chroma = jpeg2000->has_alpha ?
+//                                      jpeg2000_chroma_interleaved_RGBA :
+//                                      jpeg2000_chroma_interleaved_RGB;
+//
+//        /* Only disable transforms if we have been able to fetch the
+//         * untransformed dimensions.
+//         */
+//        options = jpeg2000_decoding_options_alloc();
+//
+//        error = jpeg2000_decode_image(jpeg2000->handle, &jpeg2000->img,
+//                                      jpeg2000_colorspace_RGB, chroma,
+//                                      options);
+//        jpeg2000_decoding_options_free(options);
+//        if (error.code) {
+//            vips__jpeg2000_error(&error);
+//            return (-1);
+//        }
+//    }
+//
+//    memcpy(VIPS_REGION_ADDR(or, 0, r->top),
+//           jpeg2000->data + jpeg2000->stride * line,
+//           VIPS_IMAGE_SIZEOF_LINE(or->im));
 
     return (0);
 }
