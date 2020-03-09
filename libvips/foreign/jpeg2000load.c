@@ -271,8 +271,8 @@ vips_foreign_load_jpeg2000_copy_8bit_greyscale( VipsRegion *out, struct opj_imag
     
     int wr = int_ceildivpow2( comps[0].w, comps[0].factor );
     int hr = int_ceildivpow2( comps[0].h, comps[0].factor );
-
-
+    
+    // todo copy with offsets
     memcpy(VIPS_REGION_ADDR(out, 0, r->top),
        jpeg2000->data + jpeg2000->stride * line,
        VIPS_IMAGE_SIZEOF_LINE(or->im));
