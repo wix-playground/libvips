@@ -65,21 +65,22 @@
 #define JPT_CFMT 3
 
 #define VIPS_TYPE_FOREIGN_LOAD_JPEG2000 (vips_foreign_load_jpeg2000_get_type())
-#define VIPS_FOREIGN_LOAD_JPEG2000(obj) \
+#define VIPS_FOREIGN_LOAD_JPEG2000( obj ) \
     (G_TYPE_CHECK_INSTANCE_CAST( (obj), \
     VIPS_TYPE_FOREIGN_LOAD_JPEG2000, VipsForeignLoadJPEG2000 ))
-#define VIPS_FOREIGN_LOAD_JPEG2000_CLASS(klass) \
+#define VIPS_FOREIGN_LOAD_JPEG2000_CLASS( klass ) \
     (G_TYPE_CHECK_CLASS_CAST( (klass), \
     VIPS_TYPE_FOREIGN_LOAD_JPEG2000, VipsForeignLoadJPEG2000Class))
-#define VIPS_IS_FOREIGN_LOAD_JPEG2000(obj) \
+#define VIPS_IS_FOREIGN_LOAD_JPEG2000( obj ) \
     (G_TYPE_CHECK_INSTANCE_TYPE( (obj), VIPS_TYPE_FOREIGN_LOAD_JPEG2000 ))
-#define VIPS_IS_FOREIGN_LOAD_JPEG2000_CLASS(klass) \
+#define VIPS_IS_FOREIGN_LOAD_JPEG2000_CLASS( klass ) \
     (G_TYPE_CHECK_CLASS_TYPE( (klass), VIPS_TYPE_FOREIGN_LOAD_JPEG2000 ))
-#define VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS(obj) \
+#define VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS( obj ) \
     (G_TYPE_INSTANCE_GET_CLASS( (obj), \
     VIPS_TYPE_FOREIGN_LOAD_JPEG2000, VipsForeignLoadJPEG2000Class ))
 
-typedef struct _VipsForeignLoadJPEG2000 {
+typedef struct _VipsForeignLoadJPEG2000
+{
     VipsForeignLoad parent_object;
 
     gboolean has_alpha;
@@ -97,70 +98,75 @@ typedef struct _VipsForeignLoadJPEG2000 {
 
 } VipsForeignLoadJPEG2000;
 
-typedef struct _VipsForeignLoadJPEG2000Class {
+typedef struct _VipsForeignLoadJPEG2000Class
+{
     VipsForeignLoadClass parent_class;
 
     /* Open the reader, eg. call opj_read_header() etc. This
      * has to be a vfunc so generate can restart after minimise.
      */
-    int (*open)(VipsForeignLoadJPEG2000 *jpeg2000);
+    int (*open)( VipsForeignLoadJPEG2000 *jpeg2000 );
 
 } VipsForeignLoadJPEG2000Class;
 
-G_DEFINE_ABSTRACT_TYPE(VipsForeignLoadJPEG2000, vips_foreign_load_jpeg2000,
-                       VIPS_TYPE_FOREIGN_LOAD);
+G_DEFINE_ABSTRACT_TYPE( VipsForeignLoadJPEG2000, vips_foreign_load_jpeg2000,
+                        VIPS_TYPE_FOREIGN_LOAD );
 
 static void
-vips_foreign_load_jpeg2000_close(VipsForeignLoadJPEG2000 *jpeg2000) {
-    VIPS_FREEF(opj_stream_destroy, jpeg2000->read_stream);
-    VIPS_FREEF(opj_destroy_codec, jpeg2000->codec);
-    VIPS_FREEF(opj_image_destroy, jpeg2000->jpeg_image);
+vips_foreign_load_jpeg2000_close( VipsForeignLoadJPEG2000 *jpeg2000 )
+{
+    VIPS_FREEF( opj_stream_destroy, jpeg2000->read_stream );
+    VIPS_FREEF( opj_destroy_codec, jpeg2000->codec );
+    VIPS_FREEF( opj_image_destroy, jpeg2000->jpeg_image );
 }
 
 static void
-vips_foreign_load_jpeg2000_dispose(GObject *gobject) {
+vips_foreign_load_jpeg2000_dispose( GObject *gobject )
+{
     VipsForeignLoadJPEG2000 *jpeg2000 = (VipsForeignLoadJPEG2000 *) gobject;
 
-    vips_foreign_load_jpeg2000_close(jpeg2000);
+    vips_foreign_load_jpeg2000_close( jpeg2000 );
 
-    G_OBJECT_CLASS(vips_foreign_load_jpeg2000_parent_class)->
-            dispose(gobject);
+    G_OBJECT_CLASS( vips_foreign_load_jpeg2000_parent_class )->
+            dispose( gobject );
 }
 
 static void
-vips__jpeg2000_error(const char *fmt, const char *message) {
-    vips_error("jpeg2000", fmt, message);
+vips__jpeg2000_error( const char *fmt, const char *message )
+{
+    vips_error( "jpeg2000", fmt, message );
 }
 
 static int
-vips_foreign_load_jpeg2000_format(const char *buf, int len) {
-    if (len >= 12) {
-        if (memcmp(buf, JP2_RFC3745_MAGIC, 12) == 0 || memcmp(buf, JP2_MAGIC, 4) == 0) {
+vips_foreign_load_jpeg2000_format( const char *buf, int len )
+{
+    if ( len >= 12 ) {
+        if ( memcmp( buf, JP2_RFC3745_MAGIC, 12 ) == 0 || memcmp( buf, JP2_MAGIC, 4 ) == 0 ) {
             return JP2_CFMT;
-        } else if (memcmp(buf, J2K_CODESTREAM_MAGIC, 4) == 0) {
+        } else if ( memcmp( buf, J2K_CODESTREAM_MAGIC, 4 ) == 0 ) {
             return J2K_CFMT;
         } else
-            return (-1);
+            return ( -1 );
     }
 
-    return (0);
+    return ( 0 );
 }
 
 static int
-vips_foreign_load_jpeg2000_is_a(const char *buf, int len) 
+vips_foreign_load_jpeg2000_is_a( const char *buf, int len )
 {
-    return vips_foreign_load_jpeg2000_format(buf, len) > 0;
+    return vips_foreign_load_jpeg2000_format( buf, len ) > 0;
 }
 
 static VipsForeignFlags
-vips_foreign_load_jpeg2000_get_flags(VipsForeignLoad *load) 
+vips_foreign_load_jpeg2000_get_flags( VipsForeignLoad *load )
 {
-    return (VIPS_FOREIGN_SEQUENTIAL);
+    return ( VIPS_FOREIGN_SEQUENTIAL );
 }
 
 static int
-vips_foreign_load_jpeg2000_set_header(VipsForeignLoadJPEG2000 *jpeg2000,
-        VipsImage *out) 
+vips_foreign_load_jpeg2000_set_header( VipsForeignLoadJPEG2000 *jpeg2000,
+                                       VipsImage *out )
 {
     int bands;
 
@@ -173,58 +179,61 @@ vips_foreign_load_jpeg2000_set_header(VipsForeignLoadJPEG2000 *jpeg2000,
     /* FIXME should probably check the profile type ... lcms seems to be
      * able to load at least rICC and prof.
      */
-    if(jpeg2000->jpeg_image->icc_profile_len) {
-        vips_image_set_blob(out, VIPS_META_ICC_NAME,
-            (VipsCallbackFn) NULL,
-            jpeg2000->jpeg_image->icc_profile_buf,
-            jpeg2000->jpeg_image->icc_profile_len);
+    if ( jpeg2000->jpeg_image->icc_profile_len ) {
+        vips_image_set_blob( out, VIPS_META_ICC_NAME,
+                             (VipsCallbackFn) NULL,
+                             jpeg2000->jpeg_image->icc_profile_buf,
+                             jpeg2000->jpeg_image->icc_profile_len );
     }
 
     /* todo: VIPS_INTERPRETATION_sRGB is not always the right answer...
      * all grey images, perhaps.
      */
-    vips_image_pipelinev(out, VIPS_DEMAND_STYLE_SMALLTILE, NULL);
-    vips_image_init_fields(out, jpeg2000->width, jpeg2000->height, bands,
-                           VIPS_FORMAT_UCHAR, VIPS_CODING_NONE, VIPS_INTERPRETATION_sRGB,
-                           1.0, 1.0);
+    vips_image_pipelinev( out, VIPS_DEMAND_STYLE_SMALLTILE, NULL);
+    vips_image_init_fields( out, jpeg2000->width, jpeg2000->height, bands,
+                            VIPS_FORMAT_UCHAR, VIPS_CODING_NONE,
+                            VIPS_INTERPRETATION_sRGB,
+                            1.0, 1.0 );
 
-    return (0);
+    return ( 0 );
 }
 
 static int
-vips_foreign_load_jpeg2000_header(VipsForeignLoad *load) {
-    VipsObjectClass *class = VIPS_OBJECT_GET_CLASS(load);
+vips_foreign_load_jpeg2000_header( VipsForeignLoad *load )
+{
+    VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( load );
     VipsForeignLoadJPEG2000 *jpeg2000 = (VipsForeignLoadJPEG2000 *) load;
     VipsForeignLoadJPEG2000Class *jpeg2000_class =
-            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS(jpeg2000);
+            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS( jpeg2000 );
 
-    if ( jpeg2000_class->open(jpeg2000) )
-        return (-1);
+    if ( jpeg2000_class->open( jpeg2000 ))
+        return ( -1 );
 
-    switch (jpeg2000->decode_format) {
+    switch ( jpeg2000->decode_format ) {
         case J2K_CFMT: {
-            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_J2K);
+            jpeg2000->codec = opj_create_decompress( OPJ_CODEC_J2K );
             break;
         }
         case JP2_CFMT: {
-            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_JP2);
+            jpeg2000->codec = opj_create_decompress( OPJ_CODEC_JP2 );
             break;
         }
         case JPT_CFMT: {
-            jpeg2000->codec = opj_create_decompress(OPJ_CODEC_JPT);
+            jpeg2000->codec = opj_create_decompress( OPJ_CODEC_JPT );
             break;
         }
-        default:
-            vips__jpeg2000_error("failed to initialize codec %d", NULL);
-            vips_foreign_load_jpeg2000_close(jpeg2000);
-            return (-1);
+        default: {
+            vips__jpeg2000_error( "failed to initialize codec %d", NULL);
+            vips_foreign_load_jpeg2000_close( jpeg2000 );
+            return ( -1 );
+        }
     }
-    
+
     /* Read the main header of the codestream and if necessary the JP2 boxes*/
-    if (! opj_read_header(jpeg2000->read_stream, jpeg2000->codec, &jpeg2000->jpeg_image)) {
-        vips__jpeg2000_error("failed to read the header", NULL);
-        vips_foreign_load_jpeg2000_close(jpeg2000);
-        return (-1);
+    if ( !opj_read_header( jpeg2000->read_stream, jpeg2000->codec, &jpeg2000->jpeg_image )) {
+        vips__jpeg2000_error( "failed to read the header", NULL);
+        vips_foreign_load_jpeg2000_close( jpeg2000 );
+        return ( -1 );
     }
 
     jpeg2000->width = jpeg2000->jpeg_image->x1;
@@ -234,122 +243,222 @@ vips_foreign_load_jpeg2000_header(VipsForeignLoad *load) {
     //todo: has_alpha
     //todo: colorspace
 
-    if (vips_foreign_load_jpeg2000_set_header(jpeg2000, load->out)) {
-        vips_foreign_load_jpeg2000_close(jpeg2000);
-        return (-1);
+    if ( vips_foreign_load_jpeg2000_set_header( jpeg2000, load->out )) {
+        vips_foreign_load_jpeg2000_close( jpeg2000 );
+        return ( -1 );
     }
 
-    vips_foreign_load_jpeg2000_close(jpeg2000);
+    vips_foreign_load_jpeg2000_close( jpeg2000 );
 
-    return (0);
+    return ( 0 );
+}
+
+/**
+Divide an integer by a power of 2 and round upwards
+@return Returns a divided by 2^b
+*/
+static int
+int_ceildivpow2( int a, int b )
+{
+    return ( a + ( 1 << b ) - 1 ) >> b;
 }
 
 static int
-vips_foreign_load_jpeg2000_generate(VipsRegion *or,
-                                    void *seq, void *a, void *b, gboolean *stop) {
+vips_foreign_load_jpeg2000_copy_8bit_greyscale( VipsRegion *out, struct opj_image_comp *comps)
+{
+    int width = comps[0].w;
+    int height = comps[0].h;
+    
+    int wr = int_ceildivpow2( comps[0].w, comps[0].factor );
+    int hr = int_ceildivpow2( comps[0].h, comps[0].factor );
+
+
+    memcpy(VIPS_REGION_ADDR(out, 0, r->top),
+       jpeg2000->data + jpeg2000->stride * line,
+       VIPS_IMAGE_SIZEOF_LINE(or->im));
+}
+
+static int
+vips_foreign_load_jpeg2000_copy_16bit_greyscale( )
+{
+
+}
+
+static int
+vips_foreign_load_jpeg2000_copy_24bit_rgb( )
+{
+
+}
+
+static int
+vips_foreign_load_jpeg2000_copy_48bit_rgb( )
+{
+
+}
+
+static int
+vips_foreign_load_jpeg2000_copy_32bit_rgba( )
+{
+
+}
+
+static int
+vips_foreign_load_jpeg2000_copy_64bit_rgba( )
+{
+
+}
+
+static int
+vips_foreign_load_jpeg2000_generate( VipsRegion *out,
+                                     void *seq, void *a, void *b, gboolean *stop )
+{
     VipsForeignLoadJPEG2000 *jpeg2000 = (VipsForeignLoadJPEG2000 *) a;
-    VipsObjectClass *class = VIPS_OBJECT_GET_CLASS(jpeg2000);
+    VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( jpeg2000 );
     VipsForeignLoadJPEG2000Class *jpeg2000_class =
-            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS(jpeg2000);
-    VipsRect *r = &or->valid;
+            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS( jpeg2000 );
+    VipsRect *r = &out->valid;
 
-    opj_codec_t* codec = NULL;
+    g_assert( r->height == 1 );
 
-    g_assert(r->height == 1);
+    if ( jpeg2000_class->open( jpeg2000 ))
+        return ( -1 );
 
-    if (jpeg2000_class->open(jpeg2000))
-        return (-1);
-
-    switch (jpeg2000->decode_format) {
+    switch ( jpeg2000->decode_format ) {
         case J2K_CFMT: { /* JPEG-2000 codestream */
             /* Get a decoder handle */
-            codec = opj_create_decompress(OPJ_CODEC_J2K);
+            jpeg2000->codec = opj_create_decompress( OPJ_CODEC_J2K );
             break;
         }
         case JP2_CFMT: { /* JPEG 2000 compressed image data */
             /* Get a decoder handle */
-            codec = opj_create_decompress(OPJ_CODEC_JP2);
+            jpeg2000->codec = opj_create_decompress( OPJ_CODEC_JP2 );
             break;
         }
         default:
-            vips__jpeg2000_error(&"failed to create codec for format " [ (jpeg2000->decode_format + '0')], NULL);
-            vips_foreign_load_jpeg2000_close(jpeg2000);
-            return (-1);
+            vips__jpeg2000_error(
+                    &"failed to create codec for format "[( jpeg2000->decode_format + '0' )],
+                    NULL);
+            vips_foreign_load_jpeg2000_close( jpeg2000 );
+            return ( -1 );
     }
 
-//    if (!jpeg2000->img) {
-//        struct jpeg2000_decoding_options *options;
-//        enum jpeg2000_chroma chroma = jpeg2000->has_alpha ?
-//                                      jpeg2000_chroma_interleaved_RGBA :
-//                                      jpeg2000_chroma_interleaved_RGB;
-//
-//        /* Only disable transforms if we have been able to fetch the
-//         * untransformed dimensions.
-//         */
-//        options = jpeg2000_decoding_options_alloc();
-//
-//        error = jpeg2000_decode_image(jpeg2000->handle, &jpeg2000->img,
-//                                      jpeg2000_colorspace_RGB, chroma,
-//                                      options);
-//        jpeg2000_decoding_options_free(options);
-//        if (error.code) {
-//            vips__jpeg2000_error(&error);
-//            return (-1);
-//        }
-//    }
-//
+    if ( !( opj_decode( jpeg2000->codec, jpeg2000->read_stream, jpeg2000->jpeg_image ) &&
+            opj_end_decompress( jpeg2000->codec, jpeg2000->read_stream ))) {
+        vips__jpeg2000_error( "failed to decompress image", NULL);
+        vips_foreign_load_jpeg2000_close( jpeg2000 );
+        return ( -1 );
+    }
+/* TODO
+*   if (image->color_space != OPJ_CLRSPC_SYCC
+*            && image->numcomps == 3 && image->comps[0].dx == image->comps[0].dy
+*            && image->comps[1].dx != 1) {
+*        image->color_space = OPJ_CLRSPC_SYCC;
+*    } else if (image->numcomps <= 2) {
+*        image->color_space = OPJ_CLRSPC_GRAY;
+*    }
+*
+*    if (image->color_space == OPJ_CLRSPC_SYCC) {
+*        color_sycc_to_rgb(image);
+*    } else if ((image->color_space == OPJ_CLRSPC_CMYK) &&
+*            (parameters.cod_format != TIF_DFMT)) {
+*        color_cmyk_to_rgb(image);
+*    } else if (image->color_space == OPJ_CLRSPC_EYCC) {
+*        color_esycc_to_rgb(image);
+*    }
+*/
+    struct opj_image_comp *comps;
+    int num_comps;
+    int precision;
+
+    comps = jpeg2000->jpeg_image->comps;
+    num_comps = jpeg2000->jpeg_image->numcomps;
+    precision = comps[0].prec;
+
+    if ( precision <= 8 ) {
+        if ( num_comps == 1 ) {
+            return vips_foreign_load_jpeg2000_copy_8bit_greyscale( out, comps );
+        } else if ( num_comps == 3) {
+            return vips_foreign_load_jpeg2000_copy_24bit_rgb();
+        } else if ( num_comps == 4) {
+            return vips_foreign_load_jpeg2000_copy_32bit_rgba();
+        } else {
+            vips__jpeg2000_error( &"cannot handle number of components "[( num_comps )], NULL);
+            vips_foreign_load_jpeg2000_close( jpeg2000 );
+            return ( -1 );
+        }
+    } else if ( precision <= 16) {
+        if ( num_comps == 1 ) {
+            return vips_foreign_load_jpeg2000_copy_16bit_greyscale();
+        } else if ( num_comps == 3) {
+            return vips_foreign_load_jpeg2000_copy_48bit_rgb();
+        } else if ( num_comps == 4) {
+            return vips_foreign_load_jpeg2000_copy_64bit_rgba();
+        } else {
+            vips__jpeg2000_error( &"cannot handle number of components "[( num_comps )], NULL);
+            vips_foreign_load_jpeg2000_close( jpeg2000 );
+            return ( -1 );
+        }
+    } else {
+        vips__jpeg2000_error( &"cannot handle precision "[( precision )], NULL);
+        vips_foreign_load_jpeg2000_close( jpeg2000 );
+        return ( -1 );
+    }
+
+
 //    memcpy(VIPS_REGION_ADDR(or, 0, r->top),
 //           jpeg2000->data + jpeg2000->stride * line,
 //           VIPS_IMAGE_SIZEOF_LINE(or->im));
 
-    return (0);
+    return ( 0 );
 }
 
 static void
-vips_foreign_load_jpeg2000_minimise(VipsObject *object, VipsForeignLoadJPEG2000 *jpeg2000) {
-    vips_foreign_load_jpeg2000_close(jpeg2000);
+vips_foreign_load_jpeg2000_minimise( VipsObject *object, VipsForeignLoadJPEG2000 *jpeg2000 )
+{
+    vips_foreign_load_jpeg2000_close( jpeg2000 );
 }
 
 static int
-vips_foreign_load_jpeg2000_load(VipsForeignLoad *load) {
+vips_foreign_load_jpeg2000_load( VipsForeignLoad *load )
+{
     VipsForeignLoadJPEG2000 *jpeg2000 = (VipsForeignLoadJPEG2000 *) load;
     VipsForeignLoadJPEG2000Class *class =
-            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS(jpeg2000);
+            VIPS_FOREIGN_LOAD_JPEG2000_GET_CLASS( jpeg2000 );
 
     VipsImage **t = (VipsImage **)
-            vips_object_local_array(VIPS_OBJECT(load), 3);
+            vips_object_local_array(VIPS_OBJECT( load ), 3 );
 
-    if (class->open(jpeg2000))
-        return (-1);
+    if ( class->open( jpeg2000 ))
+        return ( -1 );
 
-    t[0] = vips_image_new();
-    if (vips_foreign_load_jpeg2000_set_header(jpeg2000, t[0]))
-        return (-1);
+    t[0] = vips_image_new( );
+    if ( vips_foreign_load_jpeg2000_set_header( jpeg2000, t[0] ))
+        return ( -1 );
 
     /* Close input immediately at end of read.
      */
-    g_signal_connect(t[0], "minimise",
-                     G_CALLBACK(vips_foreign_load_jpeg2000_minimise), jpeg2000);
+    g_signal_connect( t[0], "minimise",
+                      G_CALLBACK( vips_foreign_load_jpeg2000_minimise ), jpeg2000 );
 
-    if (vips_image_generate(t[0],
-                            NULL, vips_foreign_load_jpeg2000_generate, NULL, jpeg2000, NULL) ||
-        vips_sequential(t[0], &t[1], NULL) ||
-        vips_image_write(t[1], load->real))
-        return (-1);
+    if ( vips_image_generate( t[0],
+                              NULL, vips_foreign_load_jpeg2000_generate, NULL, jpeg2000, NULL) ||
+            vips_sequential( t[0], &t[1], NULL) ||
+            vips_image_write( t[1], load->real ))
+        return ( -1 );
 
-    return (0);
+    return ( 0 );
 }
 
 static int
-vips_foreign_load_jpeg2000_open(VipsForeignLoadJPEG2000 *jpeg2000)
+vips_foreign_load_jpeg2000_open( VipsForeignLoadJPEG2000 *jpeg2000 )
 {
-    return (0);
+    return ( 0 );
 }
 
 static void
-vips_foreign_load_jpeg2000_class_init(VipsForeignLoadJPEG2000Class *class)
+vips_foreign_load_jpeg2000_class_init( VipsForeignLoadJPEG2000Class *class )
 {
-    GObjectClass *gobject_class = G_OBJECT_CLASS(class);
+    GObjectClass *gobject_class = G_OBJECT_CLASS( class );
     VipsObjectClass *object_class = (VipsObjectClass *) class;
     VipsForeignLoadClass *load_class = (VipsForeignLoadClass *) class;
     VipsForeignLoadJPEG2000Class *jpeg2000_class =
@@ -360,7 +469,7 @@ vips_foreign_load_jpeg2000_class_init(VipsForeignLoadJPEG2000Class *class)
     gobject_class->get_property = vips_object_get_property;
 
     object_class->nickname = "jpeg2000load_base";
-    object_class->description = _("load a JPEG2000 image");
+    object_class->description = _( "load a JPEG2000 image" );
 
     load_class->get_flags = vips_foreign_load_jpeg2000_get_flags;
     load_class->header = vips_foreign_load_jpeg2000_header;
@@ -370,11 +479,13 @@ vips_foreign_load_jpeg2000_class_init(VipsForeignLoadJPEG2000Class *class)
 }
 
 static void
-vips_foreign_load_jpeg2000_init(VipsForeignLoadJPEG2000 *jpeg2000) {
+vips_foreign_load_jpeg2000_init( VipsForeignLoadJPEG2000 *jpeg2000 )
+{
 
 }
 
-typedef struct _VipsForeignLoadJPEG2000File {
+typedef struct _VipsForeignLoadJPEG2000File
+{
     VipsForeignLoadJPEG2000 parent_object;
 
     /* Filename for load.
@@ -385,35 +496,37 @@ typedef struct _VipsForeignLoadJPEG2000File {
 
 typedef VipsForeignLoadJPEG2000Class VipsForeignLoadJPEG2000FileClass;
 
-G_DEFINE_TYPE(VipsForeignLoadJPEG2000File, vips_foreign_load_jpeg2000_file,
-              vips_foreign_load_jpeg2000_get_type());
+G_DEFINE_TYPE( VipsForeignLoadJPEG2000File, vips_foreign_load_jpeg2000_file,
+               vips_foreign_load_jpeg2000_get_type( ));
 
 static int
-vips_foreign_load_jpeg2000_file_is_a(const char *filename) {
+vips_foreign_load_jpeg2000_file_is_a( const char *filename )
+{
     char buf[12];
 
-    if (vips__get_bytes(filename, (unsigned char *) buf, 12) != 12)
-        return (0);
+    if ( vips__get_bytes( filename, (unsigned char *) buf, 12 ) != 12 )
+        return ( 0 );
 
-    return (vips_foreign_load_jpeg2000_is_a(buf, 12));
+    return ( vips_foreign_load_jpeg2000_is_a( buf, 12 ));
 }
 
 static int
-vips_foreign_load_jpeg2000_file_header(VipsForeignLoad *load) {
+vips_foreign_load_jpeg2000_file_header( VipsForeignLoad *load )
+{
     VipsForeignLoadJPEG2000 *jpeg2000 = (VipsForeignLoadJPEG2000 *) load;
     VipsForeignLoadJPEG2000File *file = (VipsForeignLoadJPEG2000File *) load;
 
-    if (VIPS_FOREIGN_LOAD_CLASS(
-            vips_foreign_load_jpeg2000_file_parent_class)->header(load)) {
+    if ( VIPS_FOREIGN_LOAD_CLASS(
+            vips_foreign_load_jpeg2000_file_parent_class )->header( load )) {
         /* Close early if our base class fails to read.
          */
-        vips_foreign_load_jpeg2000_close(jpeg2000);
-        return (-1);
+        vips_foreign_load_jpeg2000_close( jpeg2000 );
+        return ( -1 );
     }
 
-    VIPS_SETSTR(load->out->filename, file->filename);
+    VIPS_SETSTR( load->out->filename, file->filename );
 
-    return (0);
+    return ( 0 );
 }
 
 const char *vips__jpeg2000_suffs[] = {
@@ -429,30 +542,47 @@ const char *vips__jpeg2000_suffs[] = {
 };
 
 static int
-vips_foreign_load_jpeg2000_file_open(VipsForeignLoadJPEG2000 *jpeg2000)
+vips_foreign_load_jpeg2000_assign_format( VipsForeignLoadJPEG2000 *jpeg2000, char *buf )
+{
+    int format;
+    format = vips_foreign_load_jpeg2000_format( buf, 12 );
+    if ( format ) {
+        vips__jpeg2000_error( "failed to discern format", NULL);
+        return ( -1 );
+    }
+
+    jpeg2000->decode_format = format;
+    return ( 0 );
+}
+
+static int
+vips_foreign_load_jpeg2000_file_open( VipsForeignLoadJPEG2000 *jpeg2000 )
 {
     VipsForeignLoadJPEG2000File *file = (VipsForeignLoadJPEG2000File *) jpeg2000;
     char buf[12];
 
-    if (vips__get_bytes(file->filename, (unsigned char *) buf, 12) != 12)
-        return (0);
+    if ( vips__get_bytes( file->filename, (unsigned char *) buf, 12 ) != 12 )
+        return ( 0 );
 
-    jpeg2000->read_stream = opj_stream_create_default_file_stream(file->filename, 1);
-    if (!jpeg2000->read_stream) {
-        vips__jpeg2000_error("failed to create the stream from the file %s", file->filename);
-        return (-1);
+    if ( !vips_foreign_load_jpeg2000_assign_format( jpeg2000, buf )) {
+        vips__jpeg2000_error( "failed to discern format of %s", file->filename );
+        return ( -1 );
     }
 
-    jpeg2000->decode_format = vips_foreign_load_jpeg2000_format(buf, 12);
+    jpeg2000->read_stream = opj_stream_create_default_file_stream( file->filename, 1 );
+    if ( !jpeg2000->read_stream ) {
+        vips__jpeg2000_error( "failed to create the stream from the file %s", file->filename );
+        return ( -1 );
+    }
 
     return (VIPS_FOREIGN_LOAD_JPEG2000_CLASS(
-            vips_foreign_load_jpeg2000_file_parent_class)->open(jpeg2000));
+            vips_foreign_load_jpeg2000_file_parent_class )->open( jpeg2000 ));
 }
 
 static void
-vips_foreign_load_jpeg2000_file_class_init(VipsForeignLoadJPEG2000FileClass *class)
+vips_foreign_load_jpeg2000_file_class_init( VipsForeignLoadJPEG2000FileClass *class )
 {
-    GObjectClass *gobject_class = G_OBJECT_CLASS(class);
+    GObjectClass *gobject_class = G_OBJECT_CLASS( class );
     VipsObjectClass *object_class = (VipsObjectClass *) class;
     VipsForeignClass *foreign_class = (VipsForeignClass *) class;
     VipsForeignLoadClass *load_class = (VipsForeignLoadClass *) class;
@@ -471,16 +601,16 @@ vips_foreign_load_jpeg2000_file_class_init(VipsForeignLoadJPEG2000FileClass *cla
 
     jpeg2000_class->open = vips_foreign_load_jpeg2000_file_open;
 
-    VIPS_ARG_STRING(class, "filename", 1,
-                    _("Filename"),
-                    _("Filename to load from"),
-                    VIPS_ARGUMENT_REQUIRED_INPUT,
-                    G_STRUCT_OFFSET(VipsForeignLoadJPEG2000File, filename),
-                    NULL);
+    VIPS_ARG_STRING( class, "filename", 1,
+                     _( "Filename" ),
+                     _( "Filename to load from" ),
+                     VIPS_ARGUMENT_REQUIRED_INPUT,
+                     G_STRUCT_OFFSET( VipsForeignLoadJPEG2000File, filename ),
+                     NULL );
 }
 
 static void
-vips_foreign_load_jpeg2000_file_init(VipsForeignLoadJPEG2000File *file)
+vips_foreign_load_jpeg2000_file_init( VipsForeignLoadJPEG2000File *file )
 {
 }
 
@@ -496,40 +626,40 @@ typedef struct _VipsForeignLoadJPEG2000Buffer
 
 typedef VipsForeignLoadJPEG2000Class VipsForeignLoadJPEG2000BufferClass;
 
-G_DEFINE_TYPE(VipsForeignLoadJPEG2000Buffer, vips_foreign_load_jpeg2000_buffer,
-              vips_foreign_load_jpeg2000_get_type());
+G_DEFINE_TYPE( VipsForeignLoadJPEG2000Buffer, vips_foreign_load_jpeg2000_buffer,
+               vips_foreign_load_jpeg2000_get_type( ));
 
 static gboolean
-vips_foreign_load_jpeg2000_buffer_is_a(const void *buf, size_t len)
+vips_foreign_load_jpeg2000_buffer_is_a( const void *buf, size_t len )
 {
-    return (vips_foreign_load_jpeg2000_is_a(buf, len));
+    return ( vips_foreign_load_jpeg2000_is_a( buf, len ));
 }
 
 static int
-vips_foreign_load_jpeg2000_buffer_open(VipsForeignLoadJPEG2000 *jpeg2000)
+vips_foreign_load_jpeg2000_buffer_open( VipsForeignLoadJPEG2000 *jpeg2000 )
 {
     VipsForeignLoadJPEG2000Buffer *buffer = (VipsForeignLoadJPEG2000Buffer *) jpeg2000;
 
-    jpeg2000->read_stream = opj_stream_create(buffer->buf->length ,1);
-    if (!jpeg2000->read_stream) {
-        vips__jpeg2000_error("failed to create the stream from buffer", NULL);
-        return (-1);
+    jpeg2000->read_stream = opj_stream_create( buffer->buf->length, 1 );
+    if ( !jpeg2000->read_stream ) {
+        vips__jpeg2000_error( "failed to create the stream from buffer", NULL);
+        return ( -1 );
     }
 
     // todo: free user data function?
-    opj_stream_set_user_data(jpeg2000->read_stream, buffer->buf->data, NULL);
+    opj_stream_set_user_data( jpeg2000->read_stream, buffer->buf->data, NULL);
 
-    jpeg2000->decode_format = vips_foreign_load_jpeg2000_format(buffer->buf->data, buffer->buf->length);
+    jpeg2000->decode_format = vips_foreign_load_jpeg2000_format( buffer->buf->data, buffer->buf->length );
 
     return (VIPS_FOREIGN_LOAD_JPEG2000_CLASS(
-            vips_foreign_load_jpeg2000_buffer_parent_class)->open(jpeg2000));
+            vips_foreign_load_jpeg2000_buffer_parent_class )->open( jpeg2000 ));
 }
 
 static void
 vips_foreign_load_jpeg2000_buffer_class_init(
-        VipsForeignLoadJPEG2000BufferClass *class)
+        VipsForeignLoadJPEG2000BufferClass *class )
 {
-    GObjectClass *gobject_class = G_OBJECT_CLASS(class);
+    GObjectClass *gobject_class = G_OBJECT_CLASS( class );
     VipsObjectClass *object_class = (VipsObjectClass *) class;
     VipsForeignLoadClass *load_class = (VipsForeignLoadClass *) class;
     VipsForeignLoadJPEG2000Class *jpeg2000_class =
@@ -544,16 +674,16 @@ vips_foreign_load_jpeg2000_buffer_class_init(
 
     jpeg2000_class->open = vips_foreign_load_jpeg2000_buffer_open;
 
-    VIPS_ARG_BOXED(class, "buffer", 1,
-                   _("Buffer"),
-                   _("Buffer to load from"),
-                   VIPS_ARGUMENT_REQUIRED_INPUT,
-                   G_STRUCT_OFFSET(VipsForeignLoadJPEG2000Buffer, buf),
-                   VIPS_TYPE_BLOB);
+    VIPS_ARG_BOXED( class, "buffer", 1,
+                    _( "Buffer" ),
+                    _( "Buffer to load from" ),
+                    VIPS_ARGUMENT_REQUIRED_INPUT,
+                    G_STRUCT_OFFSET( VipsForeignLoadJPEG2000Buffer, buf ),
+                    VIPS_TYPE_BLOB );
 }
 
 static void
-vips_foreign_load_jpeg2000_buffer_init(VipsForeignLoadJPEG2000Buffer *buffer)
+vips_foreign_load_jpeg2000_buffer_init( VipsForeignLoadJPEG2000Buffer *buffer )
 {
 }
 
@@ -574,16 +704,16 @@ vips_foreign_load_jpeg2000_buffer_init(VipsForeignLoadJPEG2000Buffer *buffer)
  * Returns: 0 on success, -1 on error.
  */
 int
-vips_jpeg2000load(const char *filename, VipsImage **out, ...)
+vips_jpeg2000load( const char *filename, VipsImage **out, ... )
 {
     va_list ap;
     int result;
 
-    va_start(ap, out);
-    result = vips_call_split("jpeg2000load", ap, filename, out);
-    va_end(ap);
+    va_start( ap, out );
+    result = vips_call_split( "jpeg2000load", ap, filename, out );
+    va_end( ap );
 
-    return (result);
+    return ( result );
 }
 
 /**
@@ -607,7 +737,7 @@ vips_jpeg2000load(const char *filename, VipsImage **out, ...)
  * Returns: 0 on success, -1 on error.
  */
 int
-vips_jpeg2000load_buffer(void *buf, size_t len, VipsImage **out, ...)
+vips_jpeg2000load_buffer( void *buf, size_t len, VipsImage **out, ... )
 {
     va_list ap;
     VipsBlob *blob;
@@ -615,13 +745,13 @@ vips_jpeg2000load_buffer(void *buf, size_t len, VipsImage **out, ...)
 
     /* We don't take a copy of the data or free it.
      */
-    blob = vips_blob_new(NULL, buf, len);
+    blob = vips_blob_new(NULL, buf, len );
 
-    va_start(ap, out);
-    result = vips_call_split("jpeg2000load_buffer", ap, blob, out);
-    va_end(ap);
+    va_start( ap, out );
+    result = vips_call_split( "jpeg2000load_buffer", ap, blob, out );
+    va_end( ap );
 
-    vips_area_unref(VIPS_AREA(blob));
+    vips_area_unref(VIPS_AREA( blob ));
 
-    return (result);
+    return ( result );
 }
