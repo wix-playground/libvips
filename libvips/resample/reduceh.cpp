@@ -66,10 +66,6 @@ typedef struct _VipsReduceh {
 	 */
 	VipsKernel kernel;
 
-	/* Use centre rather than corner sampling convention.
-	 */
-	gboolean centre;
-
 	/* Number of points in kernel.
 	 */
 	int n_point;
@@ -80,6 +76,10 @@ typedef struct _VipsReduceh {
 	 */
 	int *matrixi[VIPS_TRANSFORM_SCALE + 1];
 	double *matrixf[VIPS_TRANSFORM_SCALE + 1];
+
+	/* Deprecated.
+	 */
+	gboolean centre;
 
 } VipsReduceh;
 
@@ -194,13 +194,11 @@ reduceh_signed_int_tab( VipsReduceh *reduceh,
 	for( int z = 0; z < bands; z++ ) {
 		int sum;
 
-		sum = reduce_sum<T, int>( in, bands, cx, n );
+		sum = reduce_sum<T, int>( in + z, bands, cx, n );
 		sum = signed_fixed_round( sum ); 
 		sum = VIPS_CLIP( min_value, sum, max_value ); 
 
 		out[z] = sum;
-
-		in += 1;
 	}
 }
 
@@ -216,10 +214,8 @@ reduceh_float_tab( VipsReduceh *reduceh,
 	const T* restrict in = (T *) pin;
 	const int n = reduceh->n_point;
 
-	for( int z = 0; z < bands; z++ ) {
-		out[z] = reduce_sum<T, double>( in, bands, cx, n );
-		in += 1;
-	}
+	for( int z = 0; z < bands; z++ )
+		out[z] = reduce_sum<T, double>( in + z, bands, cx, n );
 }
 
 /* 32-bit int output needs a double intermediate.
@@ -238,10 +234,8 @@ reduceh_unsigned_int32_tab( VipsReduceh *reduceh,
 	for( int z = 0; z < bands; z++ ) {
 		double sum;
 
-		sum = reduce_sum<T, double>( in, bands, cx, n );
-		out[z] = VIPS_CLIP( 0, sum, max_value ); 
-
-		in += 1;
+		sum = reduce_sum<T, double>( in + z, bands, cx, n );
+		out[z] = VIPS_CLIP( 0, sum, max_value );
 	}
 }
 
@@ -258,11 +252,9 @@ reduceh_signed_int32_tab( VipsReduceh *reduceh,
 	for( int z = 0; z < bands; z++ ) {
 		double sum;
 
-		sum = reduce_sum<T, double>( in, bands, cx, n );
+		sum = reduce_sum<T, double>( in + z, bands, cx, n );
 		sum = VIPS_CLIP( min_value, sum, max_value ); 
 		out[z] = sum;
-
-		in += 1;
 	}
 }
 
@@ -282,11 +274,8 @@ reduceh_notab( VipsReduceh *reduceh,
 
 	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x ); 
 
-	for( int z = 0; z < bands; z++ ) {
-		out[z] = reduce_sum<T, double>( in, bands, cx, n );
-
-		in += 1;
-	}
+	for( int z = 0; z < bands; z++ )
+		out[z] = reduce_sum<T, double>( in + z, bands, cx, n );
 }
 
 /* Tried a vector path (see reducev) but it was slower. The vectors for
@@ -319,8 +308,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	s.top = r->top;
 	s.width = r->width * reduceh->hshrink + reduceh->n_point;
 	s.height = r->height;
-	if( reduceh->centre )
-		s.width += 1;
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
@@ -334,9 +321,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 		q = VIPS_REGION_ADDR( out_region, r->left, r->top + y );
 
-		X = r->left * reduceh->hshrink;
-		if( reduceh->centre )
-			X += 0.5;
+		X = (r->left + 0.5) * reduceh->hshrink - 0.5;
 
 		/* We want p0 to be the start (ie. x == 0) of the input 
 		 * scanline we are reading from. We can then calculate the p we
@@ -351,7 +336,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 			ir->valid.left * ps;
 
 		for( int x = 0; x < r->width; x++ ) {
-			int ix = (int) X;
+			const int ix = (int) X;
 			VipsPel *p = p0 + ix * ps;
 			const int sx = X * VIPS_TRANSFORM_SCALE * 2;
 			const int six = sx & (VIPS_TRANSFORM_SCALE * 2 - 1);
@@ -441,7 +426,6 @@ vips_reduceh_build( VipsObject *object )
 		vips_object_local_array( object, 2 );
 
 	VipsImage *in;
-	int width;
 
 	if( VIPS_OBJECT_CLASS( vips_reduceh_parent_class )->build( object ) )
 		return( -1 );
@@ -499,15 +483,10 @@ vips_reduceh_build( VipsObject *object )
 	in = t[0];
 
 	/* Add new pixels around the input so we can interpolate at the edges.
-	 * In centre mode, we read 0.5 pixels more to the right, so we must
-	 * enlarge a little further.
 	 */
-	width = in->Xsize + reduceh->n_point - 1;
-	if( reduceh->centre )
-		width += 1;
 	if( vips_embed( in, &t[1], 
-		reduceh->n_point / 2 - 1, 0, 
-		width, in->Ysize,
+		reduceh->n_point / 2.0 - 1, 0, 
+		in->Xsize + reduceh->n_point - 1, in->Ysize,
 		"extend", VIPS_EXTEND_COPY,
 		(void *) NULL ) )
 		return( -1 );
@@ -581,13 +560,6 @@ vips_reduceh_class_init( VipsReducehClass *reduceh_class )
 		G_STRUCT_OFFSET( VipsReduceh, kernel ),
 		VIPS_TYPE_KERNEL, VIPS_KERNEL_LANCZOS3 );
 
-	VIPS_ARG_BOOL( reduceh_class, "centre", 7, 
-		_( "Centre" ), 
-		_( "Use centre sampling convention" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsReduceh, centre ),
-		FALSE );
-
 	/* Old name.
 	 */
 	VIPS_ARG_DOUBLE( reduceh_class, "xshrink", 3, 
@@ -596,6 +568,15 @@ vips_reduceh_class_init( VipsReducehClass *reduceh_class )
 		VIPS_ARGUMENT_REQUIRED_INPUT | VIPS_ARGUMENT_DEPRECATED,
 		G_STRUCT_OFFSET( VipsReduceh, hshrink ),
 		1, 1000000, 1 );
+
+	/* We used to let people pick centre or corner, but it's automatic now.
+	 */
+	VIPS_ARG_BOOL( reduceh_class, "centre", 7,
+		_( "Centre" ),
+		_( "Use centre sampling convention" ),
+		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
+		G_STRUCT_OFFSET( VipsReduceh, centre ),
+		FALSE );
 
 }
 
