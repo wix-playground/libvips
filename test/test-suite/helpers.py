@@ -27,13 +27,17 @@ SVG_FILE = os.path.join(IMAGES, "logo.svg")
 SVGZ_FILE = os.path.join(IMAGES, "logo.svgz")
 SVG_GZ_FILE = os.path.join(IMAGES, "logo.svg.gz")
 GIF_ANIM_FILE = os.path.join(IMAGES, "cogs.gif")
+GIF_ANIM_EXPECTED_PNG_FILE = os.path.join(IMAGES, "cogs.png")
 GIF_ANIM_DISPOSE_BACKGROUND_FILE = os.path.join(IMAGES, "dispose-background.gif")
 GIF_ANIM_DISPOSE_BACKGROUND_EXPECTED_PNG_FILE = os.path.join(IMAGES, "dispose-background.png")
+GIF_ANIM_DISPOSE_PREVIOUS_FILE = os.path.join(IMAGES, "dispose-previous.gif")
+GIF_ANIM_DISPOSE_PREVIOUS_EXPECTED_PNG_FILE = os.path.join(IMAGES, "dispose-previous.png")
 DICOM_FILE = os.path.join(IMAGES, "dicom_test_image.dcm")
 BMP_FILE = os.path.join(IMAGES, "MARBLES.BMP")
 NIFTI_FILE = os.path.join(IMAGES, "avg152T1_LR_nifti.nii.gz")
 ICO_FILE = os.path.join(IMAGES, "favicon.ico")
 HEIC_FILE = os.path.join(IMAGES, "Example1.heic")
+JPEG2000_FILE = os.path.join(IMAGES, "jpeg2000-24bit.jp2")
 
 unsigned_formats = [pyvips.BandFormat.UCHAR,
                     pyvips.BandFormat.USHORT,

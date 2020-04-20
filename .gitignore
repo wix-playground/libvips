@@ -1,4 +1,5 @@
 .idea
+venv
 compile
 .pytest_cache
 a.out

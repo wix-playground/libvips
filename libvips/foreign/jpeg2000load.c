@@ -264,7 +264,7 @@ int_ceildivpow2( int a, int b )
 }
 
 static int
-vips_foreign_load_jpeg2000_copy_8bit_greyscale( VipsRegion *out, struct opj_image_comp *comps)
+vips_foreign_load_jpeg2000_copy_8bit_greyscale( VipsRegion *out, struct opj_image_comp *comps )
 {
     int width = comps[0].w;
     int height = comps[0].h;
@@ -273,9 +273,9 @@ vips_foreign_load_jpeg2000_copy_8bit_greyscale( VipsRegion *out, struct opj_imag
     int hr = int_ceildivpow2( comps[0].h, comps[0].factor );
     
     // todo copy with offsets
-    memcpy(VIPS_REGION_ADDR(out, 0, r->top),
-       jpeg2000->data + jpeg2000->stride * line,
-       VIPS_IMAGE_SIZEOF_LINE(or->im));
+//    memcpy(VIPS_REGION_ADDR(out, 0, r->top),
+//       jpeg2000->data + jpeg2000->stride * line,
+//       VIPS_IMAGE_SIZEOF_LINE(or->im));
 }
 
 static int
@@ -285,8 +285,13 @@ vips_foreign_load_jpeg2000_copy_16bit_greyscale( )
 }
 
 static int
-vips_foreign_load_jpeg2000_copy_24bit_rgb( )
-{
+vips_foreign_load_jpeg2000_copy_24bit_rgb( VipsRegion *out, struct opj_image_comp *comps )
+{    
+    int width = comps[0].w;
+    int height = comps[0].h;
+
+    int wr = int_ceildivpow2( comps[0].w, comps[0].factor );
+    int hr = int_ceildivpow2( comps[0].h, comps[0].factor );
 
 }
 
@@ -378,7 +383,7 @@ vips_foreign_load_jpeg2000_generate( VipsRegion *out,
         if ( num_comps == 1 ) {
             return vips_foreign_load_jpeg2000_copy_8bit_greyscale( out, comps );
         } else if ( num_comps == 3) {
-            return vips_foreign_load_jpeg2000_copy_24bit_rgb();
+            return vips_foreign_load_jpeg2000_copy_24bit_rgb( out, comps );
         } else if ( num_comps == 4) {
             return vips_foreign_load_jpeg2000_copy_32bit_rgba();
         } else {

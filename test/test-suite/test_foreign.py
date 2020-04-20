@@ -1,6 +1,5 @@
 # vim: set fileencoding=utf-8 :
 import filecmp
-import sys
 import os
 import shutil
 import tempfile
@@ -14,7 +13,7 @@ from helpers import \
     BMP_FILE, NIFTI_FILE, ICO_FILE, HEIC_FILE, TRUNCATED_FILE, \
     GIF_ANIM_EXPECTED_PNG_FILE, \
     GIF_ANIM_DISPOSE_BACKGROUND_FILE, GIF_ANIM_DISPOSE_BACKGROUND_EXPECTED_PNG_FILE, \
-    GIF_ANIM_DISPOSE_PREVIOUS_FILE, GIF_ANIM_DISPOSE_PREVIOUS_EXPECTED_PNG_FILE, \
+    GIF_ANIM_DISPOSE_PREVIOUS_FILE, GIF_ANIM_DISPOSE_PREVIOUS_EXPECTED_PNG_FILE, JPEG2000_FILE, \
     temp_filename, assert_almost_equal_objects, have, skip_if_no
 
 
@@ -208,7 +207,7 @@ class TestForeign:
             x = pyvips.Image.new_from_file(JPEG_FILE)
             x = x.copy()
 
-            x.set_type(pyvips.GValue.gstr_type, 
+            x.set_type(pyvips.GValue.gstr_type,
                        "exif-ifd0-ImageDescription", "hello world")
 
             filename = temp_filename(self.tempdir, '.jpg')
@@ -242,7 +241,7 @@ class TestForeign:
             x = pyvips.Image.new_from_file(JPEG_FILE)
             x = x.copy()
 
-            x.set_type(pyvips.GValue.gstr_type, 
+            x.set_type(pyvips.GValue.gstr_type,
                        "exif-ifd2-UserComment", "hello world")
 
             filename = temp_filename(self.tempdir, '.jpg')
@@ -262,7 +261,7 @@ class TestForeign:
         q10_subsample_auto = im.jpegsave_buffer(Q=10, subsample_mode="auto")
         q10_subsample_on = im.jpegsave_buffer(Q=10, subsample_mode="on")
         q10_subsample_off = im.jpegsave_buffer(Q=10, subsample_mode="off")
-        
+
         q90 = im.jpegsave_buffer(Q=90)
         q90_subsample_auto = im.jpegsave_buffer(Q=90, subsample_mode="auto")
         q90_subsample_on = im.jpegsave_buffer(Q=90, subsample_mode="on")
@@ -270,13 +269,13 @@ class TestForeign:
 
         # higher Q should mean a bigger buffer
         assert len(q90) > len(q10)
-        
-        assert len(q10_subsample_auto) == len(q10) 
+
+        assert len(q10_subsample_auto) == len(q10)
         assert len(q10_subsample_on) == len(q10_subsample_auto)
-        assert len(q10_subsample_off) > len(q10)    
-        
-        assert len(q90_subsample_auto) == len(q90) 
-        assert len(q90_subsample_on) < len(q90) 
+        assert len(q10_subsample_off) > len(q10)
+
+        assert len(q90_subsample_auto) == len(q90)
+        assert len(q90_subsample_on) < len(q90)
         assert len(q90_subsample_off) == len(q90_subsample_auto)
 
     @skip_if_no("jpegload")
@@ -639,7 +638,7 @@ class TestForeign:
     def test_openexrload(self):
         def exr_valid(im):
             a = im(10, 10)
-            assert_almost_equal_objects(a, [0.124512, 0.159668, 0.040375, 
+            assert_almost_equal_objects(a, [0.124512, 0.159668, 0.040375,
                                             255.0],
                                         threshold=0.00001)
             assert im.width == 610
@@ -1006,13 +1005,27 @@ class TestForeign:
 
         # test that exif changes change the output of heifsave
         # first make sure we have exif support
-        #z = pyvips.Image.new_from_file(JPEG_FILE)
-        #if z.get_typeof("exif-ifd0-Orientation") != 0:
+        # z = pyvips.Image.new_from_file(JPEG_FILE)
+        # if z.get_typeof("exif-ifd0-Orientation") != 0:
         #    x = self.colour.copy()
         #    x.set("exif-ifd0-Make", "banana")
         #    buf = x.heifsave_buffer()
         #    y = pyvips.Image.new_from_buffer(buf, "")
         #    assert y.get("exif-ifd0-Make").split(" ")[0] == "banana"
+
+    @skip_if_no("jpeg2000load")
+    def test_jpeg2000load(self):
+        def jpeg2000_valid(im):
+            a = im(10, 10)
+
+            assert_almost_equal_objects(a, [75.0, 86.0, 81.0], threshold=2)
+            assert im.width == 4032
+            assert im.height == 3024
+            assert im.bands == 3
+
+        self.file_loader("jpeg2000load", JPEG2000_FILE, jpeg2000_valid)
+        self.buffer_loader("jpeg2000load_buffer", JPEG2000_FILE, jpeg2000_valid)
+
 
 if __name__ == '__main__':
     pytest.main()
