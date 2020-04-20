@@ -89,6 +89,10 @@ extern "C" {
 #include <gmodule.h>
 #include <glib-object.h>
 
+/* Needed for VipsGInputStream.
+ */
+#include <gio/gio.h>
+
 /* If we're being parsed by SWIG, remove gcc attributes.
  */
 #ifdef SWIG
