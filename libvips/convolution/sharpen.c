@@ -121,6 +121,11 @@ typedef struct _VipsSharpenConfig {
 
 #define MAX_BANDS 4
 
+#define MAX_KERNEL_WIDTH 257
+#define SQRT_2_PI 2.50662827463100024161235523934010416269302368164062 // sqrt(2 * pi)
+#define EPSILON 1.0e-15
+#define KERNEL_RANK 3
+
 G_DEFINE_TYPE(VipsSharpen, vips_sharpen, VIPS_TYPE_OPERATION )
 
 static int
@@ -242,6 +247,86 @@ vips_sharpen_init( VipsSharpen *sharpen )
     sharpen->mode = VIPS_SHARPEN_MODE_LUMINESCENCE;
 }
 
+// The function returns the width of the filter depending on the value of Sigma
+// The kernel width is expected to be between 1 and 253
+static int
+vips_unsharpmask_optimal_kernel_width_1d(VipsSharpen *sharpen) {
+    double bit_cond = sharpen->in->BandFmt == VIPS_FORMAT_UCHAR ? 3.921568627450980e-03 : 1.525902189669642e-05;
+    double GAMMA = VIPS_ABS(sharpen->sigma);
+    double ALPHA = 1.0 / (2.0 * GAMMA * GAMMA);
+    double BETA = 1.0 / (SQRT_2_PI * GAMMA);
+    int width = 5;
+
+    if (GAMMA < EPSILON)
+        return 1;
+
+    for (int index = 0; index < 1000; ++index) {
+        double normalize = 0.0;
+        int i;
+        int j = (width - 1) / 2;
+
+        for (i = -j; i <= j; ++i)
+            normalize += (exp(-ALPHA * (i * i)) * BETA);
+
+        double value = exp(-ALPHA * (j * j)) * BETA / normalize;
+        if (value < bit_cond || value < EPSILON)
+            break;
+
+        width += 2;
+    }
+
+    return width - 2;
+}
+
+static int
+vips_sharpen_calculate_kernel(VipsSharpen *sharpen, double *kernel, int *out_kernel_width, double *out_sum) {
+    VipsObjectClass *class = VIPS_OBJECT_GET_CLASS(sharpen);
+    double sigma = sharpen->sigma;
+    double radius = 2.0 * (sharpen->sigma - 1.0);
+    int kernel_width;
+    double sum = 0;
+    int u;
+    int v;
+    //			sigma := 1 + (v.Radius / 2)
+    // sigma - 1 = r / 2
+    // 2 * (sigma - 1) = r
+
+    // calculate kernel width
+    kernel_width = VIPS_CEIL(radius) * 2 + 1;
+
+    if (VIPS_ABS(radius) < EPSILON)
+        kernel_width = vips_unsharpmask_optimal_kernel_width_1d(sharpen);
+
+    if (kernel_width < 0 || kernel_width > MAX_KERNEL_WIDTH) {
+        vips_error(class->nickname, "unsupported kernel size");
+        return -1;
+    }
+
+    if (sigma <= EPSILON) {
+        // special case - generate a unity kernel
+        kernel[kernel_width / 2] = 1.0f;
+        *out_kernel_width = kernel_width;
+        return (0);
+    }
+
+    v = (kernel_width * KERNEL_RANK - 1) / 2;
+    sigma *= KERNEL_RANK;
+    for (u = -v; u <= v; ++u) {
+        double interval = exp(-(1.0 / (2.0 * sigma * sigma)) * u * u) * (1.0 / (SQRT_2_PI * sigma));
+        kernel[(u + v) / KERNEL_RANK] += interval;
+    }
+
+    for (u = 0; u < kernel_width; ++u) {
+        kernel[u] = VIPS_RINT(kernel[u] * 20.0); //20.0 because that's what they do in gaussmat
+        sum += kernel[u];
+    }
+
+    *out_kernel_width = kernel_width;
+    *out_sum = sum;
+    return (0);
+}
+
+
 static int
 vips_sharpen_build( VipsObject *object )
 {
@@ -298,6 +383,23 @@ vips_sharpen_build( VipsObject *object )
 		"precision", VIPS_PRECISION_INTEGER,
 		NULL ) )
 		return( -1 );
+
+    if( sharpen->mode == VIPS_SHARPEN_MODE_RGB) {
+        double kernel[MAX_KERNEL_WIDTH];
+        int kernel_width;
+        double sum;
+        if (vips_sharpen_calculate_kernel(sharpen, kernel, &kernel_width, &sum)) {
+            return -1;
+        }
+
+        for (int i = 0; i < kernel_width; i++) {
+            ((double*)gaussmat->data)[i] = kernel[i];
+        }
+        if (sum == 0)
+            sum = 1;
+        vips_image_set_double( gaussmat, "scale", sum );
+        gaussmat->Xsize = kernel_width;
+    }
 
 #ifdef DEBUG
 	printf( "sharpen: blurring with:\n" );
