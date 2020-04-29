@@ -384,22 +384,23 @@ vips_sharpen_build( VipsObject *object )
 		NULL ) )
 		return( -1 );
 
-    if( sharpen->mode == VIPS_SHARPEN_MODE_RGB) {
-        double kernel[MAX_KERNEL_WIDTH];
-        int kernel_width;
-        double sum;
-        if (vips_sharpen_calculate_kernel(sharpen, kernel, &kernel_width, &sum)) {
-            return -1;
-        }
-
-        for (int i = 0; i < kernel_width; i++) {
-            ((double*)gaussmat->data)[i] = kernel[i];
-        }
-        if (sum == 0)
-            sum = 1;
-        vips_image_set_double( gaussmat, "scale", sum );
-        gaussmat->Xsize = kernel_width;
-    }
+//    if( sharpen->mode == VIPS_SHARPEN_MODE_RGB) {
+////        double kernel[MAX_KERNEL_WIDTH];
+//        double *kernel = ((double*)gaussmat->data);
+//        int kernel_width;
+//        double sum;
+//        if (vips_sharpen_calculate_kernel(sharpen, kernel, &kernel_width, &sum)) {
+//            return -1;
+//        }
+////
+////        for (int i = 0; i < kernel_width; i++) {
+////            ((double*)gaussmat->data)[i] = kernel[i];
+////        }
+//        if (sum == 0)
+//            sum = 1;
+//        vips_image_set_double( gaussmat, "scale", sum );
+//        gaussmat->Xsize = kernel_width;
+//    }
 
 #ifdef DEBUG
 	printf( "sharpen: blurring with:\n" );
