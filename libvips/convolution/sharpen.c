@@ -600,7 +600,7 @@ vips_sharpen_build_lut( const VipsSharpen *sharpen )
 #ifdef DEBUG
 	{
 		VipsImage *mat = vips_image_new_matrix(65536, 1);
-		for (i = 0; i < 65536; i++)
+		for( i = 0; i < 65536; i++ )
 			*VIPS_MATRIX(mat, i1, 0) = lut[i];
 		vips_image_write_to_file(mat, "x.v", NULL);
 		printf("lut written to x.v\n");
