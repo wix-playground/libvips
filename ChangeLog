@@ -1,3 +1,16 @@
+24/4/20 started 8.9.3
+- better iiif tile naming [IllyaMoskvin]
+
+31/1/19 started 8.9.2
+- fix a deadlock with --vips-leak [DarthSim]
+- better gifload behaviour for DISPOSAL_UNSPECIFIED [DarthSim]
+- ban ppm max_value < 0 
+- add fuzz corpus to dist
+- detect read errors correctly in source_sniff
+- fix regression in autorot [malomalo]
+- thumbnail on HEIC images could select the thumbnail incorrectly under some
+  size modes [ZorinArsenij]
+
 20/6/19 started 8.9.1
 - don't use the new source loaders for new_from_file or new_from_buffer, it
   will break the loader priority system
