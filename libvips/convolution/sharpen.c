@@ -292,17 +292,16 @@ vips_sharpen_build( VipsObject *object )
 {
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( object );
 	VipsSharpen *sharpen = (VipsSharpen *) object;
-	VipsImage **t = (VipsImage **) vips_object_local_array( object, 8 );
+
 	VipsImage **bands_and_convolutions[MAX_BANDS];
 	VipsImage **sharpened_bands = (VipsImage **) vips_object_local_array(object, MAX_BANDS);
+	VipsImage *input_in_new_interpretation;
+	VipsImage *other_bands;
+	VipsImage *bands_to_join[MAX_BANDS];
+	VipsImage *joined_bands;
 	int i;
 	int num_other_bands;
 	VipsSharpenConfig config;
-
-#define input_in_new_interpretation t[0]
-#define other_bands t[3]
-#define joined_bands t[6]
-#define joined_bands_in_original_interpretation t[7]
 
 	VIPS_GATE_START( "vips_sharpen_build: build" );
 
@@ -327,8 +326,9 @@ vips_sharpen_build( VipsObject *object )
 
 	if( vips_colourspace(sharpen->in, &input_in_new_interpretation, config.interpretation, NULL ) )
 		return( -1 );
+	vips_object_local( object, input_in_new_interpretation);
 
-	if(vips_check_uncoded(class->nickname, input_in_new_interpretation ) ||
+	if( vips_check_uncoded(class->nickname, input_in_new_interpretation ) ||
 	   vips_check_bands_atleast(class->nickname, input_in_new_interpretation, 3 ) ||
 	   vips_check_format(class->nickname, input_in_new_interpretation, config.band_format ) )
 		return( -1 );
@@ -354,10 +354,12 @@ vips_sharpen_build( VipsObject *object )
 	/* Extract the other bands (if any)
 	 */
 	num_other_bands = input_in_new_interpretation->Bands - bands_to_sharpen;
-	if( num_other_bands > 0)
-		if( vips_extract_band(input_in_new_interpretation, &other_bands, bands_to_sharpen,
-							  "n", num_other_bands, NULL ))
-			return( -1 );
+	if( num_other_bands > 0) {
+		if (vips_extract_band(input_in_new_interpretation, &other_bands, bands_to_sharpen,
+		                      "n", num_other_bands, NULL))
+			return (-1);
+		vips_object_local(object, other_bands);
+	}
 
 	/* Convolve
 	 */
@@ -382,24 +384,19 @@ vips_sharpen_build( VipsObject *object )
 
 	/* Join sharpened bands and other bands.
 	 */
-	{
-		VipsImage *bands_to_join[MAX_BANDS];
+	for( i = 0; i < bands_to_sharpen; i++)
+		bands_to_join[i] = sharpened_bands[i];
 
-		for( i = 0; i < bands_to_sharpen; i++)
-			bands_to_join[i] = sharpened_bands[i];
-
-		if( num_other_bands ) {
-			bands_to_join[i++] = other_bands;
-		}
-
-		if (vips_bandjoin(bands_to_join, &joined_bands, i, NULL))
-			return( -1 );
+	if( num_other_bands ) {
+		bands_to_join[i++] = other_bands;
 	}
 
-	if( vips_colourspace(joined_bands, &joined_bands_in_original_interpretation, sharpen->in->Type, NULL ))
+	if (vips_bandjoin(bands_to_join, &joined_bands, i, NULL))
 		return( -1 );
 
-	if( vips_image_write(joined_bands_in_original_interpretation, sharpen->out ) )
+	vips_object_local( object, joined_bands );
+
+	if( vips_colourspace(joined_bands, &(sharpen->out), sharpen->in->Type, NULL ))
 		return( -1 );
 
 	VIPS_GATE_STOP( "vips_sharpen_build: build" );
