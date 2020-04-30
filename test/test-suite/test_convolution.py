@@ -196,6 +196,16 @@ class TestConvolution:
         sharp = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
         sharp.write_to_file('%s.sharpened-rgb.png' % PNG_FILE)
 
+    def test_sharpen_rgb_no_alpha__small_sigma(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=0.5, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb-small-sigma.png' % PNG_FILE)
+
+    def test_sharpen_rgb_no_alpha__unity_kernel(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=0.000001, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb-unity-kernel.png' % PNG_FILE)
+
     def test_sharpen_rgb_with_alpha(self):
         im = pyvips.Image.new_from_file(LOGO2_PNG_FILE)
         sharp = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)

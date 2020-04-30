@@ -130,7 +130,7 @@ typedef struct _VipsSharpenConfig {
  */
 #define MASK_SANITY (5000)
 
-G_DEFINE_TYPE(VipsSharpen, vips_sharpen, VIPS_TYPE_OPERATION )
+G_DEFINE_TYPE( VipsSharpen, vips_sharpen, VIPS_TYPE_OPERATION )
 
 static int
 vips_sharpen_build( VipsObject *object );
@@ -139,22 +139,24 @@ static int*
 vips_sharpen_build_lut(const VipsSharpen *sharpen);
 
 static int
-vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel );
+vips_sharpen_build_kernel_rgb(const VipsSharpen *sharpen, VipsImage **out_kernel );
 
 static int
-vips_sharpen_generate_luminescence( VipsRegion *or,
-									void *vseq, void *a, void *b, gboolean *stop );
-static int
-vips_sharpen_generate_rgb16(VipsRegion *or,
-							void *vseq, void *a, void *b, gboolean *stop );
-static int
-vips_sharpen_generate_rgb8(VipsRegion *or,
-						   void *vseq, void *a, void *b, gboolean *stop );
+vips_sharpen_kernel_rgb_optimal_width_1d(const VipsSharpen *sharpen);
 
 static int
-vips_sharpen_configure(const VipsSharpen *sharpen, VipsSharpenConfig *config);
+vips_sharpen_generate_luminescence( VipsRegion *or, void *vseq, void *a, void *b, gboolean *stop );
 
-int vips_sharpen_build_kernel_luminescence(VipsSharpen *sharpen, VipsImage **out_kernel);
+static int
+vips_sharpen_generate_rgb16( VipsRegion *or, void *vseq, void *a, void *b, gboolean *stop );
+
+static int
+vips_sharpen_generate_rgb8( VipsRegion *or, void *vseq, void *a, void *b, gboolean *stop );
+
+static int
+vips_sharpen_configure(VipsSharpen *sharpen, VipsSharpenConfig *config);
+
+int vips_sharpen_build_kernel_luminescence( const VipsSharpen *sharpen, VipsImage **out_kernel);
 
 static void
 vips_sharpen_class_init( VipsSharpenClass *class )
@@ -254,37 +256,6 @@ vips_sharpen_init( VipsSharpen *sharpen )
 	sharpen->m1 = 0.0;
 	sharpen->m2 = 3.0;
 	sharpen->mode = VIPS_SHARPEN_MODE_LUMINESCENCE;
-}
-
-// The function returns the width of the filter depending on the value of Sigma
-// The kernel width is expected to be between 1 and 253
-static int
-vips_unsharpmask_optimal_kernel_width_1d(VipsSharpen *sharpen) {
-	double bit_cond = sharpen->in->BandFmt == VIPS_FORMAT_UCHAR ? 3.921568627450980e-03 : 1.525902189669642e-05;
-	double GAMMA = VIPS_ABS(sharpen->sigma);
-	double ALPHA = 1.0 / (2.0 * GAMMA * GAMMA);
-	double BETA = 1.0 / (SQRT_2_PI * GAMMA);
-	int width = 5;
-
-	if (GAMMA < EPSILON)
-		return 1;
-
-	for (int index = 0; index < 1000; ++index) {
-		double normalize = 0.0;
-		int i;
-		int j = (width - 1) / 2;
-
-		for (i = -j; i <= j; ++i)
-			normalize += (exp(-ALPHA * (i * i)) * BETA);
-
-		double value = exp(-ALPHA * (j * j)) * BETA / normalize;
-		if (value < bit_cond || value < EPSILON)
-			break;
-
-		width += 2;
-	}
-
-	return width - 2;
 }
 
 static int
@@ -405,7 +376,7 @@ vips_sharpen_build( VipsObject *object )
 }
 
 static int
-vips_sharpen_configure(const VipsSharpen *sharpen, VipsSharpenConfig *config ) {
+vips_sharpen_configure( VipsSharpen *sharpen, VipsSharpenConfig *config ) {
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( sharpen );
 
 	static const VipsSharpenConfig luminescence_config = {
@@ -448,12 +419,12 @@ vips_sharpen_configure(const VipsSharpen *sharpen, VipsSharpenConfig *config ) {
 			return -1;
 	}
 
-	vips_object_local( sharpen, config->kernel);
+	vips_object_local( sharpen, config->kernel );
 
 	return 0;
 }
 
-int vips_sharpen_build_kernel_luminescence( VipsSharpen *sharpen, VipsImage **out_kernel ) {
+int vips_sharpen_build_kernel_luminescence( const VipsSharpen *sharpen, VipsImage **out_kernel ) {
     /* Stop at 10% of max ... a bit mean. We always sharpen a short,
     * so there's no point using a float mask.
     */
@@ -466,20 +437,20 @@ int vips_sharpen_build_kernel_luminescence( VipsSharpen *sharpen, VipsImage **ou
 }
 
 static int
-vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel )
+vips_sharpen_build_kernel_rgb( const VipsSharpen *sharpen, VipsImage **out_kernel )
 {
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( sharpen );
 	double sigma = sharpen->sigma * KERNEL_RANK;
 	double sig2 = 2 * sigma * sigma;
 	double radius = 2 * sharpen->sigma - 1;
 	int width = 2 * VIPS_CEIL(radius) + 1;
+	int rank_width = width * KERNEL_RANK - 1;
 	double sum = 0;
-	VipsImage *kernel = vips_image_new_memory();
 	int x;
+	VipsImage *kernel = vips_image_new_memory();
 
-//TODO
-//    if (VIPS_ABS(radius) < EPSILON)
-//        width = vips_unsharpmask_optimal_kernel_width_1d(sharpen);
+    if (VIPS_ABS(radius) < EPSILON)
+        width = vips_sharpen_kernel_rgb_optimal_width_1d(sharpen);
 
 	if( width >= MASK_SANITY ) {
 		vips_error( class->nickname, "%s", _( "mask too large" ) );
@@ -500,16 +471,10 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel )
 
 	memset( kernel->data, 0, VIPS_IMAGE_SIZEOF_IMAGE(kernel) );
 
-	if (sharpen->sigma <= EPSILON) {
-		// special case - generate a unity kernel
-		*VIPS_MATRIX( kernel, width / 2, 0 ) = 1.0;
-	} else {
-		int rank_width = width * KERNEL_RANK - 1;
-		for (x = 0; x <= rank_width; ++x) {
-			int xo = x - rank_width / 2;
-			double interval = exp(-(xo * xo) / sig2);
-			*VIPS_MATRIX( kernel, x / KERNEL_RANK, 0 ) += interval;
-		}
+	for (x = 0; x <= rank_width; ++x) {
+		int xo = x - rank_width / 2;
+		double interval = exp(-(xo * xo) / sig2);
+		*VIPS_MATRIX( kernel, x / KERNEL_RANK, 0 ) += interval;
 	}
 
 	double normalize = 20.0 / (SQRT_2_PI * sigma);
@@ -531,6 +496,36 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel )
 	return( 0 );
 }
 
+static int
+vips_sharpen_kernel_rgb_optimal_width_1d( const VipsSharpen *sharpen ) {
+	double min_amplitude = sharpen->in->BandFmt == VIPS_FORMAT_UCHAR ? 3.921568627450980e-03 : 1.525902189669642e-05;
+	double gamma = VIPS_ABS(sharpen->sigma);
+	double alpha = 1.0 / (2.0 * gamma * gamma);
+	double beta = 1.0 / (SQRT_2_PI * gamma);
+	int width = 5;
+	int index;
+
+	if (gamma < EPSILON)
+		return 1;
+
+	for (index = 0; index < 1000; ++index) {
+		double normalize = 0.0;
+		int i;
+		int j = (width - 1) / 2;
+		double value;
+
+		for (i = -j; i <= j; ++i)
+			normalize += (exp(-alpha * (i * i)) * beta);
+
+		value = exp(-alpha * (j * j)) * beta / normalize;
+		if (value < min_amplitude)
+			break;
+
+		width += 2;
+	}
+
+	return width - 2;
+}
 
 static int*
 vips_sharpen_build_lut(const VipsSharpen *sharpen ) {
