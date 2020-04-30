@@ -136,7 +136,7 @@ static int
 vips_sharpen_build( VipsObject *object );
 
 static int*
-vips_sharpen_build_lut(VipsSharpen *sharpen);
+vips_sharpen_build_lut(const VipsSharpen *sharpen);
 
 static int
 vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel );
@@ -152,7 +152,7 @@ vips_sharpen_generate_rgb8(VipsRegion *or,
 						   void *vseq, void *a, void *b, gboolean *stop );
 
 static int
-vips_sharpen_configure(VipsSharpen *sharpen, VipsSharpenConfig *config);
+vips_sharpen_configure(const VipsSharpen *sharpen, VipsSharpenConfig *config);
 
 int vips_sharpen_build_kernel_luminescence(VipsSharpen *sharpen, VipsImage **out_kernel);
 
@@ -320,10 +320,7 @@ vips_sharpen_build( VipsObject *object )
 		return (-1);
 	}
 
-	if( sharpen->mode == VIPS_SHARPEN_MODE_LUMINESCENCE &&
-	   !(sharpen->lut = vips_sharpen_build_lut(sharpen)) )
-		return( -1 );
-
+	sharpen->lut = config.lut;
 
 	if( vips_colourspace(sharpen->in, &input_in_new_interpretation, config.interpretation, NULL ) )
 		return( -1 );
@@ -408,7 +405,7 @@ vips_sharpen_build( VipsObject *object )
 }
 
 static int
-vips_sharpen_configure( VipsSharpen *sharpen, VipsSharpenConfig *config ) {
+vips_sharpen_configure(const VipsSharpen *sharpen, VipsSharpenConfig *config ) {
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( sharpen );
 
 	static const VipsSharpenConfig luminescence_config = {
@@ -536,7 +533,7 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen, VipsImage **out_kernel )
 
 
 static int*
-vips_sharpen_build_lut( VipsSharpen *sharpen ) {
+vips_sharpen_build_lut(const VipsSharpen *sharpen ) {
 	int *lut;
 	int i;
 
