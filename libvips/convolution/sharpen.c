@@ -407,28 +407,30 @@ vips_sharpen_build( VipsObject *object )
 	vips_matrixprint( gaussmat, NULL );
 #endif /*DEBUG*/
 
+    int bands_to_sharpen = VIPS_MIN(input_in_new_interpretation->Bands, config->bands_to_sharpen);
+
     /* Initialize bands and convolutions array
      */
-	for( i = 0; i < config->bands_to_sharpen; i++ )
+    for( i = 0; i < bands_to_sharpen; i++ )
         bands_and_convolutions[i] = (VipsImage **) vips_object_local_array(object, 2);
 
     /* Extract the bands we want to sharpen
      */
-	for( i = 0; i < config->bands_to_sharpen; i++ )
+	for( i = 0; i < bands_to_sharpen; i++ )
         if (vips_extract_band(input_in_new_interpretation, &(bands_and_convolutions[i])[0], i, NULL))
             return( -1 );
 
 	/* Extract the other bands (if any)
 	 */
-	num_other_bands = input_in_new_interpretation->Bands - config->bands_to_sharpen;
+	num_other_bands = input_in_new_interpretation->Bands - bands_to_sharpen;
 	if( num_other_bands > 0)
-        if( vips_extract_band(input_in_new_interpretation, &other_bands, config->bands_to_sharpen,
+        if( vips_extract_band(input_in_new_interpretation, &other_bands, bands_to_sharpen,
                               "n", num_other_bands, NULL ))
             return( -1 );
 
     /* Convolve
      */
-    for( i = 0; i < config->bands_to_sharpen; i++) {
+    for( i = 0; i < bands_to_sharpen; i++) {
         if (vips_convsep(bands_and_convolutions[i][0], &(bands_and_convolutions[i])[1], gaussmat,
                          "precision", VIPS_PRECISION_INTEGER,
                          NULL))
@@ -452,7 +454,7 @@ vips_sharpen_build( VipsObject *object )
     {
         VipsImage *bands_to_join[MAX_BANDS];
 
-        for( i = 0; i < config->bands_to_sharpen; i++)
+        for( i = 0; i < bands_to_sharpen; i++)
             bands_to_join[i] = sharpened_bands[i];
 
         if( num_other_bands ) {
