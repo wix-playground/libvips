@@ -153,32 +153,53 @@ vips_gaussmat_build( VipsObject *object )
 		VIPS_DEMAND_STYLE_ANY, NULL );
 	if( vips_image_write_prepare( create->out ) )
 		return( -1 );
+//
+//    sum = 0.0;
+//    for( y = 0; y < height; y++ ) {
+//        for( x = 0; x < width; x++ ) {
+//            int xo = x - width / 2;
+//            int yo = y - height / 2;
+//            double distance = xo * xo + yo * yo;
+//            double v = exp( -distance / sig2 );
+//
+//            if( gaussmat->precision != VIPS_PRECISION_FLOAT )
+//                v = VIPS_RINT( 20 * v );
+//
+//            *VIPS_MATRIX( create->out, x, y ) = v;
+//            sum += v;
+//        }
+//    }
 
 	memset( create->out->data, 0, VIPS_IMAGE_SIZEOF_IMAGE(create->out) );
 
+    double sigma = gaussmat->sigma * KERNEL_RANK;
     if (gaussmat->sigma <= EPSILON) {
         // special case - generate a unity kernel
         *VIPS_MATRIX( create->out, width / 2, 0 ) = 1.0;
     } else {
-        int v = (width * KERNEL_RANK - 1) / 2;
 
-        double sigma = gaussmat->sigma * KERNEL_RANK;
-        for (int u = -v; u <= v; ++u) {
-            double interval = exp(-(1.0 / (2.0 * sigma * sigma)) * u * u) * (1.0 / (SQRT_2_PI * sigma));
-            *VIPS_MATRIX( create->out, (u + v) / KERNEL_RANK, 0 ) += interval;
-        }
-
-        for (int u = 0; u < width; ++u) {
-            double *p = VIPS_MATRIX(create->out, u, 0);
-            if( gaussmat->precision != VIPS_PRECISION_FLOAT )
-                *p = VIPS_RINT(*p * 20);
-
-            sum += *p;
+        double sig2 = 2 * sigma * sigma;
+        int rank_width = width * KERNEL_RANK - 1;
+        for (x = 0; x <= rank_width; ++x) {
+            int xo = x - rank_width / 2;
+            double distance = xo * xo;
+            double interval = exp(-distance / sig2);
+            *VIPS_MATRIX( create->out, x / KERNEL_RANK, 0 ) += interval;
         }
     }
 
-	/* Make sure we can't make sum == 0: it'd certainly cause /0 later.
-	 */
+    double normalize = SQRT_2_PI * sigma;
+    for (x = 0; x < width; ++x) {
+        double *p = VIPS_MATRIX(create->out, x, 0);
+        *p /= normalize;
+        if( gaussmat->precision != VIPS_PRECISION_FLOAT )
+            *p = VIPS_RINT(*p * 20);
+
+        sum += *p;
+    }
+
+    /* Make sure we can't make sum == 0: it'd certainly cause /0 later.
+     */
 	if( sum == 0 )
 		sum = 1;
 
