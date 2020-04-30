@@ -91,10 +91,6 @@ G_DEFINE_TYPE( VipsGaussmat, vips_gaussmat, VIPS_TYPE_CREATE );
  */
 #define MASK_SANITY (5000)
 
-#define EPSILON 1.0e-15
-#define KERNEL_RANK 3
-#define SQRT_2_PI 2.50662827463100024161235523934010416269302368164062 // sqrt(2 * pi)
-
 static int
 vips_gaussmat_build( VipsObject *object )
 {
@@ -106,7 +102,7 @@ vips_gaussmat_build( VipsObject *object )
 
 	int x, y;
 	int width, height;
-	double sum = 0;
+	double sum;
 
 	if( VIPS_OBJECT_CLASS( vips_gaussmat_parent_class )->build( object ) )
 		return( -1 );
@@ -123,26 +119,18 @@ vips_gaussmat_build( VipsObject *object )
 	/* Find the size of the mask. Limit the mask size to 10k x 10k for
 	 * sanity. We allow x == 0, meaning a 1x1 mask.
 	 */
-//	for( x = 0; x < max_x; x++ ) {
-//		double v = exp( - ((double)(x * x)) / sig2 );
-//
-//		if( v < gaussmat->min_ampl )
-//			break;
-//	}
-    double radius = 2 * gaussmat->sigma - 1;
-    x = VIPS_CEIL(radius);
+	for( x = 0; x < max_x; x++ ) {
+		double v = exp( - ((double)(x * x)) / sig2 );
+
+		if( v < gaussmat->min_ampl )
+			break;
+	}
 	if( x >= MASK_SANITY ) {
 		vips_error( class->nickname, "%s", _( "mask too large" ) );
 		return( -1 );
 	}
-//	width = 2 * x - 1;
-	width = 2 * x + 1;
-
-//TODO
-//    if (VIPS_ABS(radius) < EPSILON)
-//        width = vips_unsharpmask_optimal_kernel_width_1d(sharpen);
-
-    height = gaussmat->separable ? 1 : width;
+	width = 2 * x - 1;
+	height = gaussmat->separable ? 1 : width;
 
 	vips_image_init_fields( create->out,
 		width, height, 1,
@@ -153,53 +141,25 @@ vips_gaussmat_build( VipsObject *object )
 		VIPS_DEMAND_STYLE_ANY, NULL );
 	if( vips_image_write_prepare( create->out ) )
 		return( -1 );
-//
-//    sum = 0.0;
-//    for( y = 0; y < height; y++ ) {
-//        for( x = 0; x < width; x++ ) {
-//            int xo = x - width / 2;
-//            int yo = y - height / 2;
-//            double distance = xo * xo + yo * yo;
-//            double v = exp( -distance / sig2 );
-//
-//            if( gaussmat->precision != VIPS_PRECISION_FLOAT )
-//                v = VIPS_RINT( 20 * v );
-//
-//            *VIPS_MATRIX( create->out, x, y ) = v;
-//            sum += v;
-//        }
-//    }
 
-	memset( create->out->data, 0, VIPS_IMAGE_SIZEOF_IMAGE(create->out) );
+	sum = 0.0;
+	for( y = 0; y < height; y++ ) {
+		for( x = 0; x < width; x++ ) {
+			int xo = x - width / 2;
+			int yo = y - height / 2;
+			double distance = xo * xo + yo * yo;
+			double v = exp( -distance / sig2 );
 
-    double sigma = gaussmat->sigma * KERNEL_RANK;
-    if (gaussmat->sigma <= EPSILON) {
-        // special case - generate a unity kernel
-        *VIPS_MATRIX( create->out, width / 2, 0 ) = 1.0;
-    } else {
+			if( gaussmat->precision != VIPS_PRECISION_FLOAT )
+				v = VIPS_RINT( 20 * v );
 
-        double sig2 = 2 * sigma * sigma;
-        int rank_width = width * KERNEL_RANK - 1;
-        for (x = 0; x <= rank_width; ++x) {
-            int xo = x - rank_width / 2;
-            double distance = xo * xo;
-            double interval = exp(-distance / sig2);
-            *VIPS_MATRIX( create->out, x / KERNEL_RANK, 0 ) += interval;
-        }
-    }
+			*VIPS_MATRIX( create->out, x, y ) = v;
+			sum += v;
+		}
+	}
 
-    double normalize = SQRT_2_PI * sigma;
-    for (x = 0; x < width; ++x) {
-        double *p = VIPS_MATRIX(create->out, x, 0);
-        *p /= normalize;
-        if( gaussmat->precision != VIPS_PRECISION_FLOAT )
-            *p = VIPS_RINT(*p * 20);
-
-        sum += *p;
-    }
-
-    /* Make sure we can't make sum == 0: it'd certainly cause /0 later.
-     */
+	/* Make sure we can't make sum == 0: it'd certainly cause /0 later.
+	 */
 	if( sum == 0 )
 		sum = 1;
 
