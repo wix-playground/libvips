@@ -473,12 +473,12 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen,
 	double sig2 = 2 * sigma * sigma;
 	double radius = 2 * sharpen->sigma - 1;
 	int width = 2 * VIPS_CEIL( radius ) + 1;
-	int rank_width = width * KERNEL_RANK - 1;
 	double sum = 0;
-	int x;
 	double normalize = 20 / (SQRT_2_PI * sigma);
-	double *kernel_data;
 	VipsImage *kernel;
+	double *kernel_data;
+	int rank_width;
+	int x;
 
 	if( VIPS_ABS( radius ) < EPSILON )
 		width = vips_sharpen_kernel_rgb_optimal_width_1d( sharpen );
@@ -506,6 +506,7 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen,
 	kernel_data = VIPS_MATRIX( kernel, 0, 0 );
 	memset( kernel_data, 0, VIPS_IMAGE_SIZEOF_IMAGE( kernel ) );
 
+	rank_width = width * KERNEL_RANK - 1;
 	for( x = 0; x <= rank_width; ++x ) {
 		int xo = x - rank_width / 2;
 		double interval = exp( -(xo * xo) / sig2 );
