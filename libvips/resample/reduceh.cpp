@@ -71,11 +71,10 @@ typedef struct _VipsReduceh {
 	int n_point;
 
 	/* Precalculated interpolation matrices. int (used for pel
-	 * sizes up to short), and double (for all others). We go to
-	 * scale + 1 so we can round-to-nearest safely.
+	 * sizes up to short), and double (for all others).
 	 */
-	int *matrixi[VIPS_TRANSFORM_SCALE + 1];
-	double *matrixf[VIPS_TRANSFORM_SCALE + 1];
+	int *matrixi[VIPS_TRANSFORM_SCALE];
+	double *matrixf[VIPS_TRANSFORM_SCALE];
 
 	/* Deprecated.
 	 */
@@ -313,7 +312,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" ); 
 
-	for( int y = 0; y < r->height; y ++ ) { 
+	for( int y = 0; y < r->height; y++ ) { 
 		VipsPel *p0;
 		VipsPel *q;
 
@@ -338,9 +337,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		for( int x = 0; x < r->width; x++ ) {
 			const int ix = (int) X;
 			VipsPel *p = p0 + ix * ps;
-			const int sx = X * VIPS_TRANSFORM_SCALE * 2;
-			const int six = sx & (VIPS_TRANSFORM_SCALE * 2 - 1);
-			const int tx = (six + 1) >> 1;
+			const int sx = X * VIPS_TRANSFORM_SCALE;
+			const int tx = sx & (VIPS_TRANSFORM_SCALE - 1);
 			const int *cxi = reduceh->matrixi[tx];
 			const double *cxf = reduceh->matrixf[tx];
 
@@ -451,7 +449,7 @@ vips_reduceh_build( VipsObject *object )
 			"%s", _( "reduce factor too large" ) );
 		return( -1 );
 	}
-	for( int x = 0; x < VIPS_TRANSFORM_SCALE + 1; x++ ) {
+	for( int x = 0; x < VIPS_TRANSFORM_SCALE; x++ ) {
 		reduceh->matrixf[x] = 
 			VIPS_ARRAY( object, reduceh->n_point, double ); 
 		reduceh->matrixi[x] = 
