@@ -1,4 +1,5 @@
 # vim: set fileencoding=utf-8 :
+import filecmp
 from functools import reduce
 
 import os
@@ -753,16 +754,13 @@ class TestConversion:
         for f in files:
             if '.autorot.' not in f and not f.startswith('.'):
                 filename = os.path.join(rotation_images, f)
-                out = filename.replace('.jpg', '.autorot.jpg').replace('.png', '.autorot.jpg')
+                expected = filename.replace('.jpg', '.autorot.jpg').replace('.png', '.autorot.jpg')
 
-                print filename + '->' + out
+                actual = temp_filename(self.tempdir, '.jpg')
 
-                im = pyvips.Image.new_from_file(filename).autorot().write_to_file(out)
+                pyvips.Image.new_from_file(filename).autorot().write_to_file(actual)
 
-                # assert im.width == 308
-                # assert im.height == 410
-
-        # assert filecmp.cmp(os.path.join(rotation_images, '1-tall'), filename, shallow=False)
+                assert filecmp.cmp(expected, actual, shallow=False)
        
     def test_scaleimage(self):
         for fmt in noncomplex_formats:
