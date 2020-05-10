@@ -750,23 +750,19 @@ class TestConversion:
         rotation_images = os.path.join(IMAGES, 'rotation')
         files = os.listdir(rotation_images)
         files.sort(reverse=True)
-        print files
-        images = []
+
         for f in files:
             if '.autorot.' not in f:
                 filename = os.path.join(rotation_images, f)
+                out = filename.replace('.jpg', '.autorot.jpg')
                 
-                print filename
-                images.append(pyvips.Image.new_from_file(filename)) 
-                images[-1].autorot()        
-        
+                print filename + '->' + out
+
+                im = pyvips.Image.new_from_file(filename).autorot().write_to_file(out)
+
                 # assert im.width == 308
                 # assert im.height == 410
 
-                out = filename.replace('.jpg', '.autorot.jpg')
-                print out
-                images[-1].write_to_file(out)
-    
         # assert filecmp.cmp(os.path.join(rotation_images, '1-tall'), filename, shallow=False)
        
     def test_scaleimage(self):

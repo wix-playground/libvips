@@ -100,6 +100,9 @@ vips_autorot_get_angle( VipsImage *im )
 		break;
 
 	default:
+		/* Other values do rotate + mirror, don't bother handling them
+		 * though, how common can mirroring be.
+		 */
 		angle = VIPS_ANGLE_D0;
 		break;
 	}
@@ -147,10 +150,6 @@ vips_autorot_build( VipsObject *object )
 
 	if( VIPS_OBJECT_CLASS( vips_autorot_parent_class )->build( object ) )
 		return( -1 );
-
-	g_object_set( object, 
-		"angle", vips_autorot_get_angle( autorot->in ),
-		NULL );
 	
     int orientation = 0;
     VipsAngle angle;
@@ -181,7 +180,7 @@ vips_autorot_build( VipsObject *object )
         break;
         
     case 5:
-        angle = VIPS_ANGLE_D270;
+        angle = VIPS_ANGLE_D90;
         flip = TRUE;
         break;
         
@@ -190,7 +189,7 @@ vips_autorot_build( VipsObject *object )
         break;
         
     case 7:
-        angle = VIPS_ANGLE_D90;
+        angle = VIPS_ANGLE_D270;
         flip = TRUE;
         break;
         
@@ -213,9 +212,8 @@ vips_autorot_build( VipsObject *object )
                   "flip", flip,
                   NULL );
 
+    int last = 0;
 
-    int last;
-    
     if( angle != VIPS_ANGLE_D0 ) {
         last = 0;
         if( vips_rot( autorot->in, &t[last], angle, NULL ) )
@@ -223,7 +221,7 @@ vips_autorot_build( VipsObject *object )
     }
 
     if ( flip ) {
-        last++;
+        last = 1;
         if ( vips_flip(t[last-1], &t[last], VIPS_DIRECTION_HORIZONTAL, NULL) )
             return ( -1 );
     } 
@@ -277,6 +275,7 @@ static void
 vips_autorot_init( VipsAutorot *autorot )
 {
 	autorot->angle = VIPS_ANGLE_D0;
+	autorot->flip = FALSE;
 }
 
 /**
@@ -288,12 +287,13 @@ vips_autorot_init( VipsAutorot *autorot )
  * Optional arguments:
  *
  * * @angle: output #VipsAngle the image was rotated by
+ * * @flip: output whether the image was flipped 
  *
  * Look at the image metadata and rotate the image to make it upright. The
  * #VIPS_META_ORIENTATION tag is removed from @out to prevent accidental 
  * double rotation. 
  *
- * Read @angle to find the amount the image was rotated by. 
+ * Read @angle to find the amount the image was rotated by.
  *
  * See also: vips_autorot_get_angle(), vips_autorot_remove_angle(), vips_rot().
  *
@@ -311,4 +311,3 @@ vips_autorot( VipsImage *in, VipsImage **out, ... )
 
 	return( result );
 }
-
