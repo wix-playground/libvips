@@ -749,7 +749,7 @@ class TestConversion:
     def test_autorot(self):
         rotation_images = os.path.join(IMAGES, 'rotation')
         files = os.listdir(rotation_images)
-        files.sort()
+        files.sort(reverse=True)
         print files
         images = []
         for f in files:
