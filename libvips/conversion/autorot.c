@@ -168,7 +168,7 @@ vips_autorot_build( VipsObject *object )
         
     case 2:
         angle = VIPS_ANGLE_D0;
-        flip = 1;
+        flip = TRUE;
         break;
         
     case 3:
@@ -177,12 +177,12 @@ vips_autorot_build( VipsObject *object )
         
     case 4:
         angle = VIPS_ANGLE_D180;
-        flip = 1;
+        flip = TRUE;
         break;
         
     case 5:
         angle = VIPS_ANGLE_D270;
-        flip = 1;
+        flip = TRUE;
         break;
         
     case 6:
@@ -191,7 +191,7 @@ vips_autorot_build( VipsObject *object )
         
     case 7:
         angle = VIPS_ANGLE_D90;
-        flip = 1;
+        flip = TRUE;
         break;
         
     case 8:
@@ -200,7 +200,7 @@ vips_autorot_build( VipsObject *object )
         
     default:
         angle = VIPS_ANGLE_D0;
-        flip = 0;
+        flip = FALSE;
         break;
         
     }
@@ -213,16 +213,16 @@ vips_autorot_build( VipsObject *object )
                   "flip", flip,
                   NULL );
 
-    if ( angle == VIPS_ANGLE_D0 && flip != 1 ) {
+    if ( angle == VIPS_ANGLE_D0 && !flip ) {
         if( vips_copy( autorot->in, &t[2], NULL ) )
             return( -1 );
     } else {
         if( angle != VIPS_ANGLE_D0 ) {
-            if( vips_rot( autorot->in, &t[0], autorot->angle, NULL ) )
+            if( vips_rot( autorot->in, &t[0], angle, NULL ) )
                 return( -1 );
         }
 
-        if ( flip == 1 ) {
+        if ( flip ) {
             if ( vips_flip(t[0], &t[1], VIPS_DIRECTION_HORIZONTAL, NULL) )
                 return ( -1 );
         }

@@ -748,21 +748,24 @@ class TestConversion:
 
     def test_autorot(self):
         rotation_images = os.path.join(IMAGES, 'rotation')
+        files = os.listdir(rotation_images)
+        files.sort()
+        print files
+        images = []
+        for f in files:
+            if '.autorot.' not in f:
+                filename = os.path.join(rotation_images, f)
+                
+                print filename
+                images.append(pyvips.Image.new_from_file(filename)) 
+                images[-1].autorot()        
         
-        print os.path.join(rotation_images, '1-tall.jpg')
-        
-        im = pyvips.Image.new_from_file(os.path.join(rotation_images, '1-tall.jpg'))
-    
-        # filename = temp_filename(self.tempdir, '.png')
-        
-        im.autorot()
-        
-        assert im.width == 308
-        assert im.height == 410
-        # im.write_to_file(filename)
-    
-        # Uncomment to see output file
-        # animation.write_to_file('dispose-background.png')
+                # assert im.width == 308
+                # assert im.height == 410
+
+                out = filename.replace('.jpg', '.autorot.jpg')
+                print out
+                images[-1].write_to_file(out)
     
         # assert filecmp.cmp(os.path.join(rotation_images, '1-tall'), filename, shallow=False)
        
