@@ -160,39 +160,29 @@ vips_autorot_build( VipsObject *object )
         orientation = 1;
 
     switch( orientation ) {
-    case 0:
-    case 1:
-        angle = VIPS_ANGLE_D0;
-        break;
-        
+
     case 2:
         angle = VIPS_ANGLE_D0;
         flip = TRUE;
         break;
-        
+
+    case 4:
+        flip = TRUE;
+
     case 3:
         angle = VIPS_ANGLE_D180;
         break;
         
-    case 4:
-        angle = VIPS_ANGLE_D180;
-        flip = TRUE;
-        break;
-        
     case 5:
-        angle = VIPS_ANGLE_D90;
         flip = TRUE;
-        break;
-        
+
     case 6:
         angle = VIPS_ANGLE_D90;
         break;
         
     case 7:
-        angle = VIPS_ANGLE_D270;
         flip = TRUE;
-        break;
-        
+
     case 8:
         angle = VIPS_ANGLE_D270;
         break;
@@ -212,32 +202,31 @@ vips_autorot_build( VipsObject *object )
                   "flip", flip,
                   NULL );
 
-
     if( angle != VIPS_ANGLE_D0 && flip) {
         if( vips_rot( autorot->in, &t[0], angle, NULL ) )
             return( -1 );
 
-        if ( vips_flip(t[0], &t[1], VIPS_DIRECTION_HORIZONTAL, NULL ) )
+        if( vips_flip( t[0], &t[1], VIPS_DIRECTION_HORIZONTAL, NULL ) )
             return ( -1 );
 
-        if ( vips_copy( t[1], &t[2], NULL ) )
+        if( vips_copy( t[1], &t[2], NULL ) )
             return( -1 );
     }
     else if( angle != VIPS_ANGLE_D0 ) {
-        if ( vips_rot( autorot->in, &t[0], angle, NULL))
+        if( vips_rot( autorot->in, &t[0], angle, NULL))
             return ( -1 );
 
-        if ( vips_copy( t[0], &t[2], NULL))
+        if( vips_copy( t[0], &t[2], NULL))
             return ( -1 );
     }
-    else if ( flip ) {
-        if ( vips_flip(autorot->in, &t[0], VIPS_DIRECTION_HORIZONTAL, NULL ) )
+    else if( flip ) {
+        if( vips_flip( autorot->in, &t[0], VIPS_DIRECTION_HORIZONTAL, NULL ) )
             return ( -1 );
 
-        if ( vips_copy( t[0], &t[2], NULL ) )
+        if( vips_copy( t[0], &t[2], NULL ) )
             return( -1 );
     } else {
-        if ( vips_copy( autorot->in, &t[2], NULL ) )
+        if( vips_copy( autorot->in, &t[2], NULL ) )
             return( -1 );
     }
 
