@@ -1,8 +1,8 @@
 # vim: set fileencoding=utf-8 :
 from functools import reduce
+
 import os
 import pytest
-import filecmp
 import tempfile
 import shutil
 
@@ -749,7 +749,9 @@ class TestConversion:
     def test_autorot(self):
         rotation_images = os.path.join(IMAGES, 'rotation')
         
-        im = pyvips.Image.new_from_file(os.path.join(rotation_images, '1-tall'), n=-1)
+        print os.path.join(rotation_images, '1-tall.jpg')
+        
+        im = pyvips.Image.new_from_file(os.path.join(rotation_images, '1-tall.jpg'))
     
         # filename = temp_filename(self.tempdir, '.png')
         
@@ -764,7 +766,6 @@ class TestConversion:
     
         # assert filecmp.cmp(os.path.join(rotation_images, '1-tall'), filename, shallow=False)
        
-
     def test_scaleimage(self):
         for fmt in noncomplex_formats:
             test = self.colour.cast(fmt)
