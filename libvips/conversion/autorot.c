@@ -212,22 +212,34 @@ vips_autorot_build( VipsObject *object )
                   "flip", flip,
                   NULL );
 
-    int last = 0;
 
-    if( angle != VIPS_ANGLE_D0 ) {
-        last = 0;
-        if( vips_rot( autorot->in, &t[last], angle, NULL ) )
+    if( angle != VIPS_ANGLE_D0 && flip) {
+        if( vips_rot( autorot->in, &t[0], angle, NULL ) )
+            return( -1 );
+
+        if ( vips_flip(t[0], &t[1], VIPS_DIRECTION_HORIZONTAL, NULL ) )
+            return ( -1 );
+
+        if ( vips_copy( t[1], &t[2], NULL ) )
             return( -1 );
     }
-
-    if ( flip ) {
-        last = 1;
-        if ( vips_flip(t[last-1], &t[last], VIPS_DIRECTION_HORIZONTAL, NULL) )
+    else if( angle != VIPS_ANGLE_D0 ) {
+        if ( vips_rot( autorot->in, &t[0], angle, NULL))
             return ( -1 );
-    } 
 
-    if ( vips_copy( t[last], &t[2], NULL ) )
-        return( -1 );
+        if ( vips_copy( t[0], &t[2], NULL))
+            return ( -1 );
+    }
+    else if ( flip ) {
+        if ( vips_flip(autorot->in, &t[0], VIPS_DIRECTION_HORIZONTAL, NULL ) )
+            return ( -1 );
+
+        if ( vips_copy( t[0], &t[2], NULL ) )
+            return( -1 );
+    } else {
+        if ( vips_copy( autorot->in, &t[2], NULL ) )
+            return( -1 );
+    }
 
     vips_autorot_remove_angle( t[2] );
     

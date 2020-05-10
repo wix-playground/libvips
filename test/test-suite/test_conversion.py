@@ -749,13 +749,12 @@ class TestConversion:
     def test_autorot(self):
         rotation_images = os.path.join(IMAGES, 'rotation')
         files = os.listdir(rotation_images)
-        files.sort(reverse=True)
 
         for f in files:
-            if '.autorot.' not in f:
+            if '.autorot.' not in f and not f.startswith('.'):
                 filename = os.path.join(rotation_images, f)
-                out = filename.replace('.jpg', '.autorot.jpg')
-                
+                out = filename.replace('.jpg', '.autorot.jpg').replace('.png', '.autorot.jpg')
+
                 print filename + '->' + out
 
                 im = pyvips.Image.new_from_file(filename).autorot().write_to_file(out)
