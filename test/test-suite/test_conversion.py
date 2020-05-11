@@ -750,17 +750,35 @@ class TestConversion:
     def test_autorot(self):
         rotation_images = os.path.join(IMAGES, 'rotation')
         files = os.listdir(rotation_images)
+        files.sort()
 
+        meta = {
+            0: {'w': 290, 'h': 442},
+            1: {'w': 308, 'h': 410},
+            2: {'w': 308, 'h': 410},
+            3: {'w': 308, 'h': 410},
+            4: {'w': 308, 'h': 410},
+            5: {'w': 231, 'h': 308},
+            6: {'w': 231, 'h': 308},
+            7: {'w': 231, 'h': 308},
+            8: {'w': 231, 'h': 308},
+        }
+
+        i = 0
         for f in files:
             if '.autorot.' not in f and not f.startswith('.'):
-                filename = os.path.join(rotation_images, f)
-                expected = filename.replace('.jpg', '.autorot.png').replace('.png', '.autorot.png')
+                source_filename = os.path.join(rotation_images, f)
 
-                actual = temp_filename(self.tempdir, '.png')
+                actual_filename = temp_filename(self.tempdir, '.png')
 
-                pyvips.Image.new_from_file(filename).autorot().write_to_file(actual)
+                pyvips.Image.new_from_file(source_filename).autorot().write_to_file(actual_filename)
 
-                assert filecmp.cmp(expected, actual, shallow=False)
+                actual = pyvips.Image.new_from_file(actual_filename)
+
+                assert actual.width == meta[i]['w']
+                assert actual.height == meta[i]['h']
+                assert actual.get('orientation') if actual.get_typeof('orientation') else None is None
+                i = i + 1
        
     def test_scaleimage(self):
         for fmt in noncomplex_formats:
