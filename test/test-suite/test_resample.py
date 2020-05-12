@@ -1,8 +1,10 @@
 # vim: set fileencoding=utf-8 :
+import math
+
 import pytest
 
 import pyvips
-from helpers import JPEG_FILE, HEIC_FILE, all_formats, have, LOGO3_PNG_FILE
+from helpers import JPEG_FILE, HEIC_FILE, all_formats, have, LOGO3_PNG_FILE, IMAGES
 
 
 # Run a function expecting a complex image on a two-band image
@@ -74,6 +76,44 @@ class TestResample:
 
             assert (x - im).abs().max() == 0
 
+    def test_affine_nohalo(self):
+        im = pyvips.Image.new_from_file(LOGO3_PNG_FILE)
+        new_width = 328.0
+        new_height = 98.0
+
+        in_width = im.width
+        factor = in_width / new_width
+        shrink = math.floor(factor)
+        if shrink < 1:
+            shrink = 1
+
+        residual = shrink / factor
+        print('factor=%s' % factor)
+        print('shrink=%s' % shrink)
+        print('residual=%s' % residual)
+
+        if shrink > 1:
+            print('shrinking')
+            im = im.shrink(shrink, shrink)
+
+            shrunk_width = int(im.width)
+            shrunk_height = int(im.height)
+
+            residualx = new_width / shrunk_width
+            residualy = new_height / shrunk_height
+
+            residual = min(residualx, residualy)
+        print('after shrink residual=%s' % residual)
+
+        for interp in ["nearest", "bicubic", "bilinear", "nohalo", "lbb"]:
+            if residual:
+                interpolate = pyvips.Interpolate.new(interp)
+                im = im.affine([residual, 0, 0, residual], interpolate=interpolate)
+                im.write_to_file('%s-affined-%s.png' % (LOGO3_PNG_FILE, interp))
+
+            sharp = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+            sharp.write_to_file('%s-affined-%s-sharpened-rgb.png' % (LOGO3_PNG_FILE, interp))
+
     def test_reduce(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)
         # cast down to 0-127, the smallest range, so we aren't messed up by
@@ -115,9 +155,45 @@ class TestResample:
         assert x.height == 1
 
     def test_resize_logo3__lanczos3(self):
-        im = pyvips.Image.new_from_file(LOGO3_PNG_FILE)
-        resized = im.resize(328.0 / 2382.0, kernel='lanczos3')
-        resized.write_to_file('%s.resized-lanczos.png' % LOGO3_PNG_FILE)
+        self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0)
+
+    def test_resize_and_sharpen_tiny(self):
+        self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
+
+    @staticmethod
+    def resize_and_sharpen(filename, new_width):
+        im = pyvips.Image.new_from_file(filename)
+        # im = im.colourspace('scrgb')
+        # im = im.premultiply()
+        kernel = 'approx-lanczos3'
+        # kernel = 'mitchell'
+        # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
+        print('new_width / im.width=', new_width / im.width)
+        im = im.resize(new_width / im.width, kernel=kernel)
+        # im = im.unpremultiply()
+        im.write_to_file('%s.resized-lanczos.png' % filename)
+        # im = im.thumbnail_image(328, linear=True)
+        # im.write_to_file('%s.thumbnail-linear.png' % filename)
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s.resized-lanczos-sharpened.png' % filename)
+
+    def test_thumbnail_logo3(self):
+        filename = IMAGES + '/logo3.png'
+        im = pyvips.Image.new_from_file(filename)
+        im = im.thumbnail_image(328, linear=True)
+        im.write_to_file('%s.thumbnail-linear.png' % filename)
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s.thumbnail-linear-sharpened.png' % filename)
+
+    def test_resize_logo3_solid_bg__lanczos3(self):
+        im = pyvips.Image.new_from_file(IMAGES + '/logo3-solid-bg.png')
+        im = im.premultiply()
+        kernel = 'lanczos3'
+        # kernel = 'mitchell'
+        im = im.resize(328.0 / 2382.0, kernel=kernel)
+        im = im.unpremultiply()
+        im = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        im.write_to_file('%s.resized-lanczos.png' % LOGO3_PNG_FILE)
 
     def test_shrink(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)

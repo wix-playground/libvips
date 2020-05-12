@@ -471,7 +471,7 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen,
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( sharpen );
 	double sigma = sharpen->sigma * KERNEL_RANK;
 	double sig2 = 2 * sigma * sigma;
-	double radius = 2 * sharpen->sigma - 1;
+	double radius = sharpen->sigma; //2 * sharpen->sigma - 1;
 	int width = 2 * VIPS_CEIL( radius ) + 1;
 	double sum = 0;
 	double normalize = 20 / (SQRT_2_PI * sigma);

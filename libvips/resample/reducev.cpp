@@ -599,8 +599,10 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 
 		case VIPS_FORMAT_FLOAT:
 		case VIPS_FORMAT_COMPLEX:
-			reducev_float_tab<float>( reducev,
-				q, p, ne, lskip, cyf );
+			reducev_notab<float>( reducev,
+			                       q, p, ne, lskip, Y - (int) Y );
+//			reducev_float_tab<float>( reducev,
+//				q, p, ne, lskip, cyf );
 			break;
 
 		case VIPS_FORMAT_DPCOMPLEX:

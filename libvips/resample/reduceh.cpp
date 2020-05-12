@@ -113,7 +113,8 @@ vips_reduce_get_points( VipsKernel kernel, double shrink )
 		return( rint( 2 * 2 * shrink ) + 1 ); 
 
 	case VIPS_KERNEL_LANCZOS3:
-		return( rint( 2 * 3 * shrink ) + 1 ); 
+	case VIPS_KERNEL_APPROX_LANCZOS3:
+		return( rint( 2 * 3 * shrink ) + 1 );
 
 	default:
 		g_assert_not_reached();
@@ -153,12 +154,18 @@ vips_reduce_make_mask( double *c, VipsKernel kernel, double shrink, double x )
 	case VIPS_KERNEL_LANCZOS3:
 		calculate_coefficients_lanczos( c, 3, shrink, x ); 
 		break;
-
+	case VIPS_KERNEL_APPROX_LANCZOS3:
+		calculate_coefficients_approx_lanczos( c, 3, shrink, x );
+		break;
 	default:
 		g_assert_not_reached();
 		break;
 	}
 }
+
+#ifndef restrict
+#define restrict __restrict__
+#endif
 
 template <typename T, int max_value>
 static void inline
@@ -275,18 +282,42 @@ reduceh_notab( VipsReduceh *reduceh,
 	const int bands, double x )
 {
 	T* restrict out = (T *) pout;
-	const T* restrict in = (T *) pin;
+	const T* restrict band_pixels = (T *) pin;
 	const int n = reduceh->n_point;
 
 	double cx[MAX_POINT];
 
-	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x ); 
+	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x );
 
-	for( int z = 0; z < bands; z++ ) {
-		out[z] = reduce_sum<T, double>( in, bands, cx, n );
+	// RGB channels
+	for( int band_index = 0; band_index < bands - 1; band_index++ ) {
+		const T *rgb_band = band_pixels;
+		const T *alpha_band = &band_pixels[bands - 1];
+		double sum = 0;
+		double normalize = 0;
 
-		in += 1;
+		for( int i = 0; i < n; i++ ) {
+			sum += alpha_band[0] * cx[i] * rgb_band[0];
+			normalize += alpha_band[0];
+
+			rgb_band += bands;
+			alpha_band += bands;
+		}
+
+		out[band_index] = sum / normalize;
+		band_pixels += 1;
 	}
+
+	//Alpha channel
+	const T *alpha_band = &band_pixels[bands - 1];
+	double sum = 0;
+
+	for( int i = 0; i < n; i++ ) {
+		sum += cx[i] * alpha_band[0];
+		alpha_band += bands;
+	}
+
+	out[bands - 1] = sum;
 }
 
 /* Tried a vector path (see reducev) but it was slower. The vectors for
@@ -404,8 +435,10 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 			case VIPS_FORMAT_FLOAT:
 			case VIPS_FORMAT_COMPLEX:
-				reduceh_float_tab<float>( reduceh,
-					q, p, bands, cxf );
+//				reduceh_float_tab<float>( reduceh,
+//					q, p, bands, cxf );
+				reduceh_notab<float>( reduceh,
+				                       q, p, bands, X - ix );
 				break;
 
 			case VIPS_FORMAT_DOUBLE:
