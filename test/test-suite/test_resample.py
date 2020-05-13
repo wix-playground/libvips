@@ -157,6 +157,9 @@ class TestResample:
     def test_resize_logo3__lanczos3(self):
         self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0)
 
+    def test_resize_and_sharpen_zetta(self):
+        self.resize_and_sharpen(IMAGES + '/zetta.png', 436.0)
+
     def test_resize_and_sharpen_tiny(self):
         self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
 
@@ -165,12 +168,13 @@ class TestResample:
         im = pyvips.Image.new_from_file(filename)
         # im = im.colourspace('scrgb')
         # im = im.premultiply()
+        # im = im.unpremultiply()
+
         kernel = 'approx-lanczos3'
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
         im = im.resize(new_width / im.width, kernel=kernel)
-        # im = im.unpremultiply()
         im.write_to_file('%s.resized-lanczos.png' % filename)
         # im = im.thumbnail_image(328, linear=True)
         # im.write_to_file('%s.thumbnail-linear.png' % filename)

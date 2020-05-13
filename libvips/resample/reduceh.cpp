@@ -273,52 +273,88 @@ reduceh_signed_int32_tab( VipsReduceh *reduceh,
 	}
 }
 
+
 /* Ultra-high-quality version for double images.
  */
 template <typename T>
 static void inline
 reduceh_notab( VipsReduceh *reduceh,
-	VipsPel *pout, const VipsPel *pin,
-	const int bands, double x )
+               VipsPel *pout, const VipsPel *pin,
+               const int bands, double x )
 {
 	T* restrict out = (T *) pout;
-	const T* restrict band_pixels = (T *) pin;
+	const T* restrict in = (T *) pin;
 	const int n = reduceh->n_point;
 
 	double cx[MAX_POINT];
 
 	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x );
 
-	// RGB channels
-	for( int band_index = 0; band_index < bands - 1; band_index++ ) {
-		const T *rgb_band = band_pixels;
-		const T *alpha_band = &band_pixels[bands - 1];
+	for( int z = 0; z < bands; z++ ) {
+		out[z] = reduce_sum<T, double>( in, bands, cx, n );
+
+		in += 1;
+	}
+}
+
+#define EPSILON  (1.0e-12)
+
+static inline double reciprocal(const double x)
+{
+	double sign;
+
+	/*
+	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
+	*/
+	sign=x < 0.0 ? -1.0 : 1.0;
+	if ((sign*x) >= EPSILON)
+		return (1.0/x);
+	return (sign/EPSILON);
+}
+
+template <typename T, int max_value>
+static void inline
+reduceh_notab_blend( VipsReduceh *reduceh,
+               VipsPel *pout, const VipsPel *pin,
+               const int bands, double x )
+{
+	T* restrict out = (T *) pout;
+	const T* restrict in = (T *) pin;
+	const int n = reduceh->n_point;
+	int band;
+	const int stride = bands;
+
+	double cx[MAX_POINT];
+
+	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x );
+
+	int alpha_band = bands - 1;
+
+	for( band = 0; band < bands - 1; band++ )
+	{
 		double sum = 0;
 		double normalize = 0;
 
-		for( int i = 0; i < n; i++ ) {
-			sum += alpha_band[0] * cx[i] * rgb_band[0];
-			normalize += alpha_band[0];
+		for( int i = 0; i < n; i++ )
+		{
+			double alpha = (double)in[i * stride + alpha_band] * (1.0 / max_value);
 
-			rgb_band += bands;
-			alpha_band += bands;
+			sum += alpha * (double)cx[i] * (double)in[i * stride + band];
+			normalize += alpha;
 		}
-
-		out[band_index] = sum / normalize;
-		band_pixels += 1;
+//		normalize = 1;
+		out[band] = (T)VIPS_CLIP(0, sum * reciprocal( normalize), max_value);
 	}
 
-	//Alpha channel
-	const T *alpha_band = &band_pixels[bands - 1];
 	double sum = 0;
 
-	for( int i = 0; i < n; i++ ) {
-		sum += cx[i] * alpha_band[0];
-		alpha_band += bands;
+	for( int i = 0; i < n - 1; i++ ) {
+		sum += cx[i] * in[i * stride + alpha_band];
 	}
 
-	out[bands - 1] = sum;
+	out[band] = (T)VIPS_CLIP(0, sum, max_value);
 }
+
 
 /* Tried a vector path (see reducev) but it was slower. The vectors for
  * horizontal reduce are just too small to get a useful speedup.
@@ -392,10 +428,16 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 			switch( in->BandFmt ) {
 			case VIPS_FORMAT_UCHAR:
-				reduceh_unsigned_int_tab
-					<unsigned char, UCHAR_MAX>(
-					reduceh,
-					q, p, bands, cxi );
+//				reduceh_unsigned_int_tab
+//					<unsigned char, UCHAR_MAX>(
+//					reduceh,
+//					q, p, bands, cxi );
+				reduceh_notab_blend<unsigned char, UCHAR_MAX>( reduceh,
+				    q, p, bands, X - ix );
+				for ( int i = 0; i < 4; i++)
+				{
+					printf( "%d,%d,%d,%d\n", i, x, y, q[i]);
+				}
 				break;
 
 			case VIPS_FORMAT_CHAR:
@@ -435,10 +477,10 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 			case VIPS_FORMAT_FLOAT:
 			case VIPS_FORMAT_COMPLEX:
-//				reduceh_float_tab<float>( reduceh,
-//					q, p, bands, cxf );
-				reduceh_notab<float>( reduceh,
-				                       q, p, bands, X - ix );
+				reduceh_float_tab<float>( reduceh,
+					q, p, bands, cxf );
+//				reduceh_notab_blend<float, INFINITY>( reduceh,
+//				                       q, p, bands, X - ix );
 				break;
 
 			case VIPS_FORMAT_DOUBLE:
