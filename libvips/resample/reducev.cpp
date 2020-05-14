@@ -507,6 +507,22 @@ reducev_notab( VipsReducev *reducev,
 		out[z] = reduce_sum<T, double>( in + z, l1, cy, n );
 }
 
+
+#define EPSILON  (1.0e-12)
+
+static inline double reciprocal(const double x)
+{
+	double sign;
+
+	/*
+	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
+	*/
+	sign=x < 0.0 ? -1.0 : 1.0;
+	if ((sign*x) >= EPSILON)
+		return (1.0/x);
+	return (sign/EPSILON);
+}
+
 static int
 vips_reducev_gen( VipsRegion *out_region, void *vseq, 
 	void *a, void *b, gboolean *stop )
@@ -533,89 +549,106 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	s.left = r->left;
 	s.top = r->top * reducev->vshrink;
 	s.width = r->width;
-	s.height = r->height * reducev->vshrink + reducev->n_point;
-	if( reducev->centre )
-		s.height += 1;
+	s.height = r->height * reducev->vshrink;
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
-	VIPS_GATE_START( "vips_reducev_gen: work" ); 
+	VIPS_GATE_START( "vips_reducev_gen: work" );
 
-	for( int y = 0; y < r->height; y ++ ) { 
-		VipsPel *q = 
-			VIPS_REGION_ADDR( out_region, r->left, r->top + y );
-		const double Y = (r->top + y) * reducev->vshrink + 
-			(reducev->centre ? 0.5 : 0.0); 
-		VipsPel *p = VIPS_REGION_ADDR( ir, r->left, (int) Y ); 
-		const int sy = Y * VIPS_TRANSFORM_SCALE * 2;
-		const int siy = sy & (VIPS_TRANSFORM_SCALE * 2 - 1);
-		const int ty = (siy + 1) >> 1;
-		const int *cyi = reducev->matrixi[ty];
-		const double *cyf = reducev->matrixf[ty];
-		const int lskip = VIPS_REGION_LSKIP( ir );
+	int resize_filter_support = 3;
+	double resize_filter_scale = (1.0/3.0);
+	double scale=reducev->vshrink;
+	double support = scale * resize_filter_support;
 
-		switch( in->BandFmt ) {
-		case VIPS_FORMAT_UCHAR:
-			reducev_unsigned_int_tab
-				<unsigned char, UCHAR_MAX>(
-				reducev,
-				q, p, ne, lskip, cyi );
-			break;
+	typedef unsigned short T;
+	const int max_value = USHRT_MAX;
+	scale = reciprocal(scale);
 
-		case VIPS_FORMAT_CHAR:
-			reducev_signed_int_tab
-				<signed char, SCHAR_MIN, SCHAR_MAX>(
-				reducev,
-				q, p, ne, lskip, cyi );
-			break;
+	for( int y = 0; y < r->height; y ++ ) {
+		double bisect = (double) (y + 0.5) / scale + EPSILON;
+		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
+		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
+		                                  (double) in->Ysize );
 
-		case VIPS_FORMAT_USHORT:
-			reducev_unsigned_int_tab
-				<unsigned short, USHRT_MAX>(
-				reducev,
-				q, p, ne, lskip, cyi );
-			break;
+		double weight[1000];
+		double density = 0;
+		int n;
 
-		case VIPS_FORMAT_SHORT:
-			reducev_signed_int_tab
-				<signed short, SHRT_MIN, SHRT_MAX>(
-				reducev,
-				q, p, ne, lskip, cyi );
-			break;
+		for( n = 0; n < (stop - start); n++ ) {
+			double wy = VIPS_ABS(
+				scale * ((double) (start + n) - bisect + 0.5) );
+			weight[n] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
+			density += weight[n];
+		}
 
-		case VIPS_FORMAT_UINT:
-			reducev_unsigned_int32_tab
-				<unsigned int, INT_MAX>(
-				reducev,
-				q, p, ne, lskip, cyf );
-			break;
+		if( n == 0 )
+			continue;
 
-		case VIPS_FORMAT_INT:
-			reducev_signed_int32_tab
-				<signed int, INT_MIN, INT_MAX>(
-				reducev,
-				q, p, ne, lskip, cyf );
-			break;
+		if( (density != 0.0) && (density != 1.0) ) {
+			/*
+			  Normalize.
+			*/
+			density = reciprocal( density );
+			for( int i = 0; i < n; i++ ) {
+				weight[i] *= density;
+			}
+		}
 
-		case VIPS_FORMAT_FLOAT:
-		case VIPS_FORMAT_COMPLEX:
-			reducev_notab<float>( reducev,
-			                       q, p, ne, lskip, Y - (int) Y );
-//			reducev_float_tab<float>( reducev,
-//				q, p, ne, lskip, cyf );
-			break;
+		const T *p = (const T*)VIPS_REGION_ADDR( ir, r->left, r->top + start );
 
-		case VIPS_FORMAT_DPCOMPLEX:
-		case VIPS_FORMAT_DOUBLE:
-			reducev_notab<double>( reducev,
-				q, p, ne, lskip, Y - (int) Y );
-			break;
+		for( int x = 0; x < r->width; x++ ) {
+			for( int i = 0; i < bands; i++ ) {
+				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
+				                               r->top + y );
+				double pixel = 0;
 
-		default:
-			g_assert_not_reached();
-			break;
+				if( i == bands - 1 ) {
+					/*
+					  No alpha blending.
+					*/
+
+					for( int j = 0; j < n; j++ ) {
+						int k = j * r->width + x;
+						T alpha_value = p[k * bands + i];
+						pixel += weight[j] * alpha_value;
+					}
+
+					q[i] = VIPS_CLIP(0, pixel, max_value);
+					printf( "%f,%f,%f,%f,%d\n",
+					        weight[0],
+					        weight[1],
+					        weight[2],
+					        weight[3],
+					        q[i] );
+					continue;
+				}
+
+				/*
+		          Alpha blending.
+		        */
+				double gamma = 0.0;
+				for( int j = 0; j < n; j++ ) {
+					int k = j * r->width + x;
+
+					T alpha_value = p[k * bands + bands - 1];
+					T pixel_value = p[k * bands + i];
+					double alpha = (1.0 / max_value) * alpha_value;
+					pixel += alpha * weight[j] * pixel_value;
+					gamma += alpha;
+				}
+				gamma = reciprocal( gamma );
+				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
+
+				printf( "%f,%f,%f,%f,%d\n",
+				        weight[0],
+				        weight[1],
+				        weight[2],
+				        weight[3],
+				        q[i] );
+			}
 		}
 	}
+
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" ); 
 
@@ -865,16 +898,16 @@ vips_reducev_build( VipsObject *object )
 
 	/* Add new pixels around the input so we can interpolate at the edges.
 	 */
-	height = in->Ysize + reducev->n_point - 1;
-	if( reducev->centre )
-		height += 1;
-	if( vips_embed( in, &t[1], 
-		0, reducev->n_point / 2 - 1, 
-		in->Xsize, height, 
-		"extend", VIPS_EXTEND_COPY,
-		(void *) NULL ) )
-		return( -1 );
-	in = t[1];
+//	height = in->Ysize + reducev->n_point - 1;
+//	if( reducev->centre )
+//		height += 1;
+//	if( vips_embed( in, &t[1],
+//		0, reducev->n_point / 2 - 1,
+//		in->Xsize, height,
+//		"extend", VIPS_EXTEND_COPY,
+//		(void *) NULL ) )
+//		return( -1 );
+//	in = t[1];
 
 	if( vips_reducev_raw( reducev, in, &t[2] ) )
 		return( -1 );

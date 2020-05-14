@@ -362,7 +362,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 {
 	VipsImage *in = (VipsImage *) a;
 	VipsReduceh *reduceh = (VipsReduceh *) b;
-	const int ps = VIPS_IMAGE_SIZEOF_PEL( in );
 	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
 
@@ -380,10 +379,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	s.left = r->left * reduceh->hshrink;
 	s.top = r->top;
-	s.width = r->width * reduceh->hshrink + reduceh->n_point;
+	s.width = r->width * reduceh->hshrink;
 	s.height = r->height;
-	if( reduceh->centre )
-		s.width += 1;
 	if( vips_region_prepare( ir, &s ) )
 		return (-1);
 
@@ -401,8 +398,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	for( int x = 0; x < r->width; x++ ) {
 		double bisect = (double) (x + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  (double) in->Xsize );
+		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5, in->Xsize );
 		double weight[1000];
 		double density = 0;
 		int n;
@@ -427,7 +423,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		}
 
 		const T *p = (const T *) VIPS_REGION_ADDR(
-			ir, ir->valid.left + start, r->top ); // - ir->valid.left * ps
+			ir, ir->valid.left + start, r->top );
 
 		for( int y = 0; y < r->height; y++ ) {
 			for( int i = 0; i < bands; i++ ) {
@@ -444,8 +440,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 						pixel += weight[j] * p[k * bands + i];
 					}
 					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
-					printf( "%d,%d,%d,%f,%f,%f,%f,%f\n",
-					        i, x, y,
+					printf( "%f,%f,%f,%f,%d\n",
 					        weight[0],
 					        weight[1],
 					        weight[2],
@@ -471,8 +466,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
 
-				printf( "%d,%d,%d,%f,%f,%f,%f,%f\n",
-				        i, x, y,
+				printf( "%f,%f,%f,%f,%d\n",
 				        weight[0],
 				        weight[1],
 				        weight[2],
