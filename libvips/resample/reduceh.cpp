@@ -376,6 +376,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top );
 #endif /*DEBUG*/
+	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
 
 	s.left = r->left * reduceh->hshrink;
 	s.top = r->top;
@@ -440,12 +442,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 						pixel += weight[j] * p[k * bands + i];
 					}
 					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
-					printf( "%f,%f,%f,%f,%d\n",
-					        weight[0],
-					        weight[1],
-					        weight[2],
-					        weight[3],
-					        q[i] );
+//					printf( "%f,%f,%f,%f,%d\n",
+//					        weight[0],
+//					        weight[1],
+//					        weight[2],
+//					        weight[3],
+//					        q[i] );
 
 					continue;
 				}
@@ -466,12 +468,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
 
-				printf( "%f,%f,%f,%f,%d\n",
-				        weight[0],
-				        weight[1],
-				        weight[2],
-				        weight[3],
-				        q[i] );
+//				printf( "%f,%f,%f,%f,%d\n",
+//				        weight[0],
+//				        weight[1],
+//				        weight[2],
+//				        weight[3],
+//				        q[i] );
 
 			}
 		}
@@ -590,6 +592,9 @@ vips_reduceh_build( VipsObject *object )
 		in->Xsize, in->Ysize, 
 		resample->out->Xsize, resample->out->Ysize );
 #endif /*DEBUG*/
+	printf( "vips_reduceh_build: reducing %d x %d image to %d x %d\n",
+	        in->Xsize, in->Ysize,
+	        resample->out->Xsize, resample->out->Ysize );
 
 	if( vips_image_generate( resample->out,
 		vips_start_one, vips_reduceh_gen, vips_stop_one,

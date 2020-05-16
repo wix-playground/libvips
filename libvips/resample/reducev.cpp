@@ -614,12 +614,12 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					}
 
 					q[i] = VIPS_CLIP(0, pixel, max_value);
-					printf( "%f,%f,%f,%f,%d\n",
-					        weight[0],
-					        weight[1],
-					        weight[2],
-					        weight[3],
-					        q[i] );
+//					printf( "%f,%f,%f,%f,%d\n",
+//					        weight[0],
+//					        weight[1],
+//					        weight[2],
+//					        weight[3],
+//					        q[i] );
 					continue;
 				}
 
@@ -639,12 +639,12 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
 
-				printf( "%f,%f,%f,%f,%d\n",
-				        weight[0],
-				        weight[1],
-				        weight[2],
-				        weight[3],
-				        q[i] );
+//				printf( "%f,%f,%f,%f,%d\n",
+//				        weight[0],
+//				        weight[1],
+//				        weight[2],
+//				        weight[3],
+//				        q[i] );
 			}
 		}
 	}
@@ -677,6 +677,8 @@ vips_reducev_vector_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_vector_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top ); 
 #endif /*DEBUG_PIXELS*/
+	printf( "vips_reducev_vector_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
 
 	s.left = r->left;
 	s.top = r->top * reducev->vshrink;
@@ -691,6 +693,8 @@ vips_reducev_vector_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_vector_gen: preparing %d x %d at %d x %d\n",
 		s.width, s.height, s.left, s.top ); 
 #endif /*DEBUG_PIXELS*/
+	printf( "vips_reducev_vector_gen: preparing %d x %d at %d x %d\n",
+	        s.width, s.height, s.left, s.top );
 
 	for( int i = 0; i < reducev->n_pass; i++ ) 
 		vips_executor_set_program( &executor[i], 

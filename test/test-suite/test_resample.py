@@ -163,6 +163,9 @@ class TestResample:
     def test_resize_and_sharpen_tiny(self):
         self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
 
+    def test_resize_and_sharpen_two_strip(self):
+        self.resize_and_sharpen(IMAGES + '/17x17.png', 16.0)
+
     @staticmethod
     def resize_and_sharpen(filename, new_width):
         im = pyvips.Image.new_from_file(filename)
@@ -172,6 +175,7 @@ class TestResample:
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
+        im = im.crop(0, 0, 17, 3)
         im = im.resize(new_width / im.width, kernel=kernel)
 
         im.write_to_file('%s.resized-lanczos.png' % filename)
