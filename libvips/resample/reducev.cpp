@@ -568,7 +568,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		double bisect = (double) (y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  (double) in->Ysize );
+		                                  (double) ir->valid.height );
 
 		double weight[1000];
 		double density = 0;
@@ -608,7 +608,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					*/
 
 					for( int j = 0; j < n; j++ ) {
-						int k = j * r->width + x;
+						int k = j * ir->valid.width + x;
 						T alpha_value = p[k * bands + i];
 						pixel += weight[j] * alpha_value;
 					}
@@ -628,7 +628,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					int k = j * r->width + x;
+					int k = j * ir->valid.width + x;
 
 					T alpha_value = p[k * bands + bands - 1];
 					T pixel_value = p[k * bands + i];

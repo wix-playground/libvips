@@ -155,7 +155,9 @@ class TestResample:
         assert x.height == 1
 
     def test_resize_logo3__lanczos3(self):
-        self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0)
+        # 2382x711 -> 328x711
+        # 13.77%x100%
+        self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0, 711.0)
 
     def test_resize_and_sharpen_zetta(self):
         self.resize_and_sharpen(IMAGES + '/zetta.png', 436.0)
@@ -164,19 +166,21 @@ class TestResample:
         self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
 
     def test_resize_and_sharpen_two_strip(self):
-        self.resize_and_sharpen(IMAGES + '/17x17.png', 16.0)
+        self.resize_and_sharpen(IMAGES + '/two-strip.png', 16.0)
 
     @staticmethod
-    def resize_and_sharpen(filename, new_width):
+    def resize_and_sharpen(filename, new_width, new_height=None):
         im = pyvips.Image.new_from_file(filename)
+        new_height = new_height or im.height * new_width / im.width
+        print('new height %s' % new_height)
         im = im.colourspace('rgb16')
 
         kernel = 'approx-lanczos3'
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
-        im = im.crop(0, 0, 17, 3)
-        im = im.resize(new_width / im.width, kernel=kernel)
+        # im = im.crop(0, 0, 17, 3)
+        im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
 
         im.write_to_file('%s.resized-lanczos.png' % filename)
         # im = im.thumbnail_image(328, linear=True)

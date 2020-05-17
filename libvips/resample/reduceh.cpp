@@ -400,7 +400,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	for( int x = 0; x < r->width; x++ ) {
 		double bisect = (double) (x + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5, in->Xsize );
+		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5, ir->valid.width );
 		double weight[1000];
 		double density = 0;
 		int n;
@@ -438,7 +438,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-						int k = y * n + j;
+						int k = y * ir->valid.width + j;
 						pixel += weight[j] * p[k * bands + i];
 					}
 					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
@@ -457,13 +457,13 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					int k = y * n + j;
+					int k = y * ir->valid.width + j;
 
 					T alpha_value = p[k * bands + bands - 1];
 					T pixel_value = p[k * bands + i];
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
-					gamma += alpha;
+					gamma += alpha * weight[j];
 				}
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
