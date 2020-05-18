@@ -546,12 +546,8 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		r->width, r->height, r->left, r->top ); 
 #endif /*DEBUG*/
 
-	s.left = r->left;
-	s.top = r->top * reducev->vshrink;
-	s.width = r->width;
-	s.height = VIPS_CEIL(r->height * reducev->vshrink);
-	if( vips_region_prepare( ir, &s ) )
-		return( -1 );
+	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
@@ -568,7 +564,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		double bisect = (double) (y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-			ir->valid.height );
+		                                  in->Ysize);
 
 		double weight[1000];
 		double density = 0;
@@ -583,6 +579,13 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 
 		if( n == 0 )
 			continue;
+
+		s.left = r->left;
+		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
+		s.width = r->width;
+		s.height = n;
+		if( vips_region_prepare( ir, &s ) )
+			return( -1 );
 
 		if( (density != 0.0) && (density != 1.0) ) {
 			/*
@@ -610,7 +613,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					for( int j = 0; j < n; j++ ) {
 //						int k = j * ir->valid.width + x;
 //						pixel += weight[j] * p[k * bands + i];
-						const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, r->top + start + j);
+						const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, s.top + j);
 						pixel += weight[j] * src[i];
 					}
 
@@ -632,7 +635,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 //					int k = j * ir->valid.width + x;
 //					T alpha_value = p[k * bands + bands - 1];
 //					T pixel_value = p[k * bands + i];
-					const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, r->top + start + j);
+					const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, s.top + j);
 					T alpha_value = src[bands - 1];
 					T pixel_value = src[i];
 					double alpha = (1.0 / max_value) * alpha_value;
@@ -680,8 +683,6 @@ vips_reducev_vector_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_vector_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top ); 
 #endif /*DEBUG_PIXELS*/
-	printf( "vips_reducev_vector_gen: generating %d x %d at %d x %d\n",
-	        r->width, r->height, r->left, r->top );
 
 	s.left = r->left;
 	s.top = r->top * reducev->vshrink;
@@ -696,8 +697,6 @@ vips_reducev_vector_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_vector_gen: preparing %d x %d at %d x %d\n",
 		s.width, s.height, s.left, s.top ); 
 #endif /*DEBUG_PIXELS*/
-	printf( "vips_reducev_vector_gen: preparing %d x %d at %d x %d\n",
-	        s.width, s.height, s.left, s.top );
 
 	for( int i = 0; i < reducev->n_pass; i++ ) 
 		vips_executor_set_program( &executor[i], 
@@ -827,11 +826,11 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		generate = vips_reducev_vector_gen;
 	}
 
-	*out = vips_image_new_memory();
-//	*out = vips_image_new();
-//	if( vips_image_pipelinev( *out,
-//		VIPS_DEMAND_STYLE_FATSTRIP, in, (void *) NULL ) )
-//		return( -1 );
+//	*out = vips_image_new_memory();
+	*out = vips_image_new();
+	if( vips_image_pipelinev( *out,
+		VIPS_DEMAND_STYLE_FATSTRIP, in, (void *) NULL ) )
+		return( -1 );
 
 	/* Size output. We need to always round to nearest, so round(), not
 	 * rint().
@@ -849,11 +848,11 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		return( -1 );
 	}
 
-	vips_image_init_fields( *out,
-	                        in->Xsize, out_height, in->Bands,
-	                        in->BandFmt, VIPS_CODING_NONE,
-	                        in->Type,
-	                        in->Xres, in->Yres );
+//	vips_image_init_fields( *out,
+//	                        in->Xsize, out_height, in->Bands,
+//	                        in->BandFmt, VIPS_CODING_NONE,
+//	                        in->Type,
+//	                        in->Xres, in->Yres );
 
 
 #ifdef DEBUG
@@ -861,25 +860,28 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		in->Xsize, in->Ysize, 
 		(*out)->Xsize, (*out)->Ysize );  
 #endif /*DEBUG*/
+	printf( "vips_reducev_build: reducing %d x %d image to %d x %d\n",
+	        in->Xsize, in->Ysize,
+	        (*out)->Xsize, (*out)->Ysize );
 
-//	if( vips_image_generate( *out,
-//		vips_reducev_start, generate, vips_reducev_stop,
-//		in, reducev ) )
-//		return( -1 );
-	VipsRegion* in_region = vips_region_new(in);
-	VipsRect in_rect = {.height=in->Ysize, .width=in->Xsize};
-	if (vips_region_prepare(in_region, &in_rect))
-		return -1;
-
-	vips_image_write_prepare(*out);
-	VipsRegion* out_region = vips_region_new(*out);
-	VipsRect out_rect = {.height=out_height, .width=in->Xsize};
-	if (vips_region_prepare(out_region, &out_rect))
-		return -1;
-
-	Sequence seq={.reducev=reducev, .ir=in_region};
-	if (vips_reducev_gen(out_region, &seq, in, reducev, NULL))
-		return -1;
+	if( vips_image_generate( *out,
+		vips_reducev_start, generate, vips_reducev_stop,
+		in, reducev ) )
+		return( -1 );
+//	VipsRegion* in_region = vips_region_new(in);
+//	VipsRect in_rect = {.height=in->Ysize, .width=in->Xsize};
+//	if (vips_region_prepare(in_region, &in_rect))
+//		return -1;
+//
+//	vips_image_write_prepare(*out);
+//	VipsRegion* out_region = vips_region_new(*out);
+//	VipsRect out_rect = {.height=out_height, .width=in->Xsize};
+//	if (vips_region_prepare(out_region, &out_rect))
+//		return -1;
+//
+//	Sequence seq={.reducev=reducev, .ir=in_region};
+//	if (vips_reducev_gen(out_region, &seq, in, reducev, NULL))
+//		return -1;
 
 //	vips_reorder_margin_hint( *out, reducev->n_point );
 
