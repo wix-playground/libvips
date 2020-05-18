@@ -524,11 +524,11 @@ static inline double reciprocal(const double x)
 }
 
 static int
-vips_reducev_gen( VipsRegion *out_region, void *vseq, 
-	void *a, void *b, gboolean *stop )
+vips_reducev_gen( VipsRegion *out_region, void *vseq,
+                  void *void_in, void *void_reducev, gboolean *stop )
 {
-	VipsImage *in = (VipsImage *) a;
-	VipsReducev *reducev = (VipsReducev *) b;
+	VipsImage *in = (VipsImage *) void_in;
+	VipsReducev *reducev = (VipsReducev *) void_reducev;
 	Sequence *seq = (Sequence *) vseq;
 	VipsRegion *ir = seq->ir;
 	VipsRect *r = &out_region->valid;
@@ -549,7 +549,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	s.left = r->left;
 	s.top = r->top * reducev->vshrink;
 	s.width = r->width;
-	s.height = r->height * reducev->vshrink;
+	s.height = VIPS_CEIL(r->height * reducev->vshrink);
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
@@ -568,7 +568,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		double bisect = (double) (y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  (double) ir->valid.height );
+			ir->valid.height );
 
 		double weight[1000];
 		double density = 0;
@@ -608,12 +608,12 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					*/
 
 					for( int j = 0; j < n; j++ ) {
-						int k = j * ir->valid.width + x;
-						T alpha_value = p[k * bands + i];
+						int k = j * (VIPS_REGION_LSKIP( ir ) / VIPS_IMAGE_SIZEOF_PEL( in )) + x;
+						T alpha_value = p[k * bands + bands - 1];
 						pixel += weight[j] * alpha_value;
 					}
 
-					q[i] = VIPS_CLIP(0, pixel, max_value);
+					q[bands - 1] = VIPS_CLIP(0, pixel, max_value);
 //					printf( "%f,%f,%f,%f,%d\n",
 //					        weight[0],
 //					        weight[1],
@@ -628,13 +628,13 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					int k = j * ir->valid.width + x;
+					int k = j * (VIPS_REGION_LSKIP( ir ) / VIPS_IMAGE_SIZEOF_PEL( in )) + x;
 
 					T alpha_value = p[k * bands + bands - 1];
 					T pixel_value = p[k * bands + i];
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
-					gamma += alpha;
+					gamma += alpha * weight[j];
 				}
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
@@ -824,10 +824,11 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		generate = vips_reducev_vector_gen;
 	}
 
-	*out = vips_image_new();
-	if( vips_image_pipelinev( *out, 
-		VIPS_DEMAND_STYLE_FATSTRIP, in, (void *) NULL ) )
-		return( -1 );
+	*out = vips_image_new_memory();
+//	*out = vips_image_new();
+//	if( vips_image_pipelinev( *out,
+//		VIPS_DEMAND_STYLE_FATSTRIP, in, (void *) NULL ) )
+//		return( -1 );
 
 	/* Size output. We need to always round to nearest, so round(), not
 	 * rint().
@@ -836,13 +837,21 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 	 * example, vipsthumbnail knows the true reduce factor (including the
 	 * fractional part), we just see the integer part here.
 	 */
-	(*out)->Ysize = VIPS_ROUND_UINT( 
+	int out_height = VIPS_ROUND_UINT(
 		resample->in->Ysize / reducev->vshrink );
+	(*out)->Ysize = out_height;
 	if( (*out)->Ysize <= 0 ) { 
 		vips_error( object_class->nickname, 
 			"%s", _( "image has shrunk to nothing" ) );
 		return( -1 );
 	}
+
+	vips_image_init_fields( *out,
+	                        in->Xsize, out_height, in->Bands,
+	                        in->BandFmt, VIPS_CODING_NONE,
+	                        in->Type,
+	                        in->Xres, in->Yres );
+
 
 #ifdef DEBUG
 	printf( "vips_reducev_build: reducing %d x %d image to %d x %d\n", 
@@ -850,12 +859,26 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		(*out)->Xsize, (*out)->Ysize );  
 #endif /*DEBUG*/
 
-	if( vips_image_generate( *out,
-		vips_reducev_start, generate, vips_reducev_stop, 
-		in, reducev ) )
-		return( -1 );
+//	if( vips_image_generate( *out,
+//		vips_reducev_start, generate, vips_reducev_stop,
+//		in, reducev ) )
+//		return( -1 );
+	VipsRegion* in_region = vips_region_new(in);
+	VipsRect in_rect = {.height=in->Ysize, .width=in->Xsize};
+	if (vips_region_prepare(in_region, &in_rect))
+		return -1;
 
-	vips_reorder_margin_hint( *out, reducev->n_point ); 
+	vips_image_write_prepare(*out);
+	VipsRegion* out_region = vips_region_new(*out);
+	VipsRect out_rect = {.height=out_height, .width=in->Xsize};
+	if (vips_region_prepare(out_region, &out_rect))
+		return -1;
+
+	Sequence seq={.reducev=reducev, .ir=in_region};
+	if (vips_reducev_gen(out_region, &seq, in, reducev, NULL))
+		return -1;
+
+//	vips_reorder_margin_hint( *out, reducev->n_point );
 
 	return( 0 );
 }
@@ -903,8 +926,7 @@ vips_reducev_build( VipsObject *object )
 	/* Add new pixels around the input so we can interpolate at the edges.
 	 */
 //	height = in->Ysize + reducev->n_point - 1;
-//	if( reducev->centre )
-//		height += 1;
+//	height += 1;
 //	if( vips_embed( in, &t[1],
 //		0, reducev->n_point / 2 - 1,
 //		in->Xsize, height,

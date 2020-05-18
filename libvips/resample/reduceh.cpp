@@ -379,23 +379,22 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
 	        r->width, r->height, r->left, r->top );
 
-	s.left = r->left * reduceh->hshrink;
-	s.top = r->top;
-	s.width = r->width * reduceh->hshrink;
-	s.height = r->height;
-	if( vips_region_prepare( ir, &s ) )
-		return (-1);
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 	int resize_filter_support = 3;
 	double resize_filter_scale = (1.0/3.0);
 	double scale = reduceh->hshrink;
 	double support = scale * resize_filter_support;
-
 	typedef unsigned short T;
 	const int max_value = USHRT_MAX;
 	scale = reciprocal(scale);
 
+	s.left = r->left * reduceh->hshrink;
+	s.top = r->top;
+	s.width = r->width * reduceh->hshrink;
+	s.height = r->height;
+	if( vips_region_prepare( ir, &s ) )
+		return (-1);
 
 	for( int x = 0; x < r->width; x++ ) {
 		double bisect = (double) (x + 0.5) / scale + EPSILON;
@@ -425,7 +424,18 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		}
 
 		const T *p = (const T *) VIPS_REGION_ADDR(
-			ir, ir->valid.left + start, r->top );
+			ir, r->left + start, r->top );
+//		g_assert(VIPS_REGION_ADDR(
+//			ir, r->left + start, r->top ) - VIPS_REGION_ADDR(
+//			ir, 0, 0 ) < VIPS_IMAGE_SIZEOF_IMAGE(in));
+//
+//		g_assert(vips_rect_includespoint( &(ir)->valid, (r->left + start), (r->top) ));
+//		if (!vips_rect_includespoint( &(ir)->valid, (r->left + start), (r->top) )) {
+//		if (!vips_rect_includespoint( &(ir)->valid, (r->left + start), (r->top) )) {
+//			printf("oops, %d,%d,%d,%d doesn't include %d,%d\n", ir->valid.left, ir->valid.top, ir->valid.width, ir->valid.height,
+//				r->left, r->top);
+//			abort();
+//		}
 
 		for( int y = 0; y < r->height; y++ ) {
 			for( int i = 0; i < bands; i++ ) {
@@ -438,7 +448,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-						int k = y * ir->valid.width + j;
+						int k = y * (VIPS_REGION_LSKIP( ir ) / VIPS_IMAGE_SIZEOF_PEL( in )) + j;
 						pixel += weight[j] * p[k * bands + i];
 					}
 					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
@@ -457,8 +467,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					int k = y * ir->valid.width + j;
-
+					int k = y * (VIPS_REGION_LSKIP( ir ) / VIPS_IMAGE_SIZEOF_PEL( in )) + j;
+					if ((int)(p + k - (const T*)VIPS_REGION_ADDR_TOPLEFT(ir)) >=
+						(int)(VIPS_REGION_SIZEOF_LINE(ir) * ir->valid.height / sizeof(T))) {
+						printf(":( diff=%d\n", p + k - (const T*)VIPS_REGION_ADDR_TOPLEFT(ir));
+//						abort();
+					}
 					T alpha_value = p[k * bands + bands - 1];
 					T pixel_value = p[k * bands + i];
 					double alpha = (1.0 / max_value) * alpha_value;
@@ -558,8 +572,7 @@ vips_reduceh_build( VipsObject *object )
 	 * enlarge a little further.
 	 */
 //	width = in->Xsize + reduceh->n_point - 1;
-//	if( reduceh->centre )
-//		width += 1;
+//	width += 1;
 //	if( vips_embed( in, &t[1],
 //		reduceh->n_point / 2 - 1, 0,
 //		width, in->Ysize,
