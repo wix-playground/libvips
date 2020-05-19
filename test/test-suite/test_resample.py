@@ -174,7 +174,7 @@ class TestResample:
         im = pyvips.Image.new_from_file(filename)
         new_height = new_height or im.height * new_width / im.width
         print('new height %s' % new_height)
-        im = im.colourspace('rgb16')
+        # im = im.colourspace('rgb16')
 
         kernel = 'approx-lanczos3'
         # kernel = 'mitchell'

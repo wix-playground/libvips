@@ -527,9 +527,10 @@ static int
 vips_reducev_gen( VipsRegion *out_region, void *vseq,
                   void *void_in, void *void_reducev, gboolean *stop )
 {
+	Sequence *seq = (Sequence *) vseq;
+
 	VipsImage *in = (VipsImage *) void_in;
 	VipsReducev *reducev = (VipsReducev *) void_reducev;
-	Sequence *seq = (Sequence *) vseq;
 	VipsRegion *ir = seq->ir;
 	VipsRect *r = &out_region->valid;
 
@@ -537,14 +538,25 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	 */
 	const int bands = in->Bands * 
 		(vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
-	int ne = r->width * bands;
 
+	const int resize_filter_support = 3;
+	const double resize_filter_scale = (1.0/3.0);
+	const double support = reducev->vshrink * resize_filter_support;
+
+	typedef unsigned short T;
+	const int max_value = USHRT_MAX;
+	const double scale = reciprocal(reducev->vshrink);
+	const gboolean do_alpha_blending = vips_image_hasalpha( in );
 	VipsRect s;
+
+	VIPS_GATE_START( "vips_reducev_gen: work" );
 
 #ifdef DEBUG
 	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
-		r->width, r->height, r->left, r->top ); 
+		r->width, r->height, r->left, r->top );
 #endif /*DEBUG*/
+	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
 
 	s.left = r->left;
 	s.top = r->top * reducev->vshrink;
@@ -553,23 +565,11 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
-	VIPS_GATE_START( "vips_reducev_gen: work" );
-
-	int resize_filter_support = 3;
-	double resize_filter_scale = (1.0/3.0);
-	double scale=reducev->vshrink;
-	double support = scale * resize_filter_support;
-
-	typedef unsigned short T;
-	const int max_value = USHRT_MAX;
-	scale = reciprocal(scale);
-
 	for( int y = 0; y < r->height; y ++ ) {
 		double bisect = (double) (y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-			ir->valid.height );
-
+		                                  ir->valid.height );
 		double weight[1000];
 		double density = 0;
 		int n;
@@ -594,33 +594,21 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 
-		const T *p = (const T*)VIPS_REGION_ADDR( ir, r->left, r->top + start );
-
 		for( int x = 0; x < r->width; x++ ) {
 			for( int i = 0; i < bands; i++ ) {
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
 				                               r->top + y );
 				double pixel = 0;
 
-				if( !vips_image_hasalpha(in) || i == bands - 1 ) {
+				if( !do_alpha_blending || i == bands - 1 ) {
 					/*
 					  No alpha blending.
 					*/
-
 					for( int j = 0; j < n; j++ ) {
-//						int k = j * ir->valid.width + x;
-//						pixel += weight[j] * p[k * bands + i];
-						const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, r->top + start + j);
-						pixel += weight[j] * src[i];
+						const T* p = (const T*)VIPS_REGION_ADDR( ir, r->left + x, r->top + start + j);
+						pixel += weight[j] * p[i];
 					}
-
-					q[i] = VIPS_CLIP(0, pixel, max_value);
-//					printf( "%f,%f,%f,%f,%d\n",
-//					        weight[0],
-//					        weight[1],
-//					        weight[2],
-//					        weight[3],
-//					        q[i] );
+					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
 					continue;
 				}
 
@@ -629,29 +617,19 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-//					int k = j * ir->valid.width + x;
-//					T alpha_value = p[k * bands + bands - 1];
-//					T pixel_value = p[k * bands + i];
-					const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, r->top + start + j);
-					T alpha_value = src[bands - 1];
-					T pixel_value = src[i];
+					const T* p = (const T*)VIPS_REGION_ADDR( ir, r->left + x, r->top + start + j);
+					T alpha_value = p[bands - 1];
+					T pixel_value = p[i];
+
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
 					gamma += alpha * weight[j];
 				}
 				gamma = reciprocal( gamma );
 				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
-
-//				printf( "%f,%f,%f,%f,%d\n",
-//				        weight[0],
-//				        weight[1],
-//				        weight[2],
-//				        weight[3],
-//				        q[i] );
 			}
 		}
 	}
-
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" ); 
 
@@ -937,6 +915,16 @@ vips_reducev_build( VipsObject *object )
 //		(void *) NULL ) )
 //		return( -1 );
 //	in = t[1];
+
+
+	//TEMP TEMP TEMP - TODO: support all interpretations instead of converting
+	VipsImage *converted_colorspace;
+	if (vips_colourspace(in, &converted_colorspace, VIPS_INTERPRETATION_RGB16))
+		return( -1 );
+
+	vips_object_local( object, converted_colorspace );
+	in = converted_colorspace;
+	//TEMP TEMP TEMP - TODO: support all interpretations instead of converting
 
 	if( vips_reducev_raw( reducev, in, &t[2] ) )
 		return( -1 );
