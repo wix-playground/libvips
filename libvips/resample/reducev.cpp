@@ -537,23 +537,59 @@ reducev_signed_int32_tab( VipsReducev *reducev,
 
 /* Ultra-high-quality version for double images.
  */
-template <typename T>
+template <typename T, int max_value>
 static void inline
 reducev_notab( VipsReducev *reducev,
 	VipsPel *pout, const VipsPel *pin,
-	const int ne, const int lskip, double y )
+	const int width_times_bands, const int lskip, double y, int bands )
 {
+	double coefficients[MAX_POINT];
+	vips_reduce_make_mask( coefficients, reducev->kernel, reducev->vshrink, y );
+
+	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
-	const int n = reducev->n_point;
-	const int l1 = lskip / sizeof( T );
+	const int stride = lskip / sizeof( T );
 
-	double cy[MAX_POINT];
+	for( int x = 0; x < width_times_bands; x++ ) {
 
-	vips_reduce_make_mask( cy, reducev->kernel, reducev->vshrink, y ); 
+		int band = x % bands;
 
-	for( int z = 0; z < ne; z++ ) 
-		out[z] = reduce_sum<T, double>( in + z, l1, cy, n );
+		if( !has_alpha || band == bands - 1 ) {
+			//No alpha blending
+			double sum = 0;
+			const T *in_element = in + x;
+
+			for( int i = 0; i < reducev->n_point; i++ ) {
+				sum += coefficients[i] * in_element[0];
+				in_element += stride;
+			}
+
+			out[x] = sum;
+			continue;
+		}
+
+		//Alpha blending
+		const T *in_element = in + x;
+		const T *in_alpha_element = in + x - band + bands - 1;
+
+		double sum = 0;
+		double gamma = 0;
+		for( int i = 0; i < reducev->n_point; i++ ) {
+			double alpha = (double)in_alpha_element[0] / max_value;
+			double multiplied_alpha = alpha * coefficients[i];
+
+			sum += multiplied_alpha * in_element[0];
+			gamma += multiplied_alpha;
+
+			in_element += stride;
+			in_alpha_element += stride;
+		}
+		gamma = reciprocal( gamma );
+
+		sum = VIPS_CLIP( 0, gamma * sum, max_value );
+		out[x] = sum;
+	}
 }
 
 static int
@@ -654,8 +690,8 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 
 		case VIPS_FORMAT_DPCOMPLEX:
 		case VIPS_FORMAT_DOUBLE:
-			reducev_notab<double>( reducev,
-			                       q, p, num_elements, lskip, Y - (int) Y );
+			reducev_notab<double, USHRT_MAX>( reducev,
+			                       q, p, num_elements, lskip, Y - (int) Y, bands );
 			break;
 
 		default:
@@ -876,7 +912,7 @@ vips_reducev_build( VipsObject *object )
 	VipsObjectClass *object_class = VIPS_OBJECT_GET_CLASS( object );
 	VipsResample *resample = VIPS_RESAMPLE( object );
 	VipsReducev *reducev = (VipsReducev *) object;
-	VipsImage **t = (VipsImage **) vips_object_local_array( object, 4 );
+	VipsImage **t = (VipsImage **) vips_object_local_array( object, 6 );
 
 	VipsImage *in;
 	int height;
@@ -909,6 +945,16 @@ vips_reducev_build( VipsObject *object )
 	if( vips_image_decode( in, &t[0] ) )
 		return( -1 );
 	in = t[0];
+
+	//TEMP TEMP TEMP
+	if( vips_colourspace(in, &t[4], VIPS_INTERPRETATION_RGB16, NULL))
+		return( -1 );
+	in = t[4];
+
+	if( vips_cast_double(in, &t[5], NULL))
+		return( -1 );
+	in = t[5];
+	//TEMP TEMP TEMP
 
 	/* Add new pixels around the input so we can interpolate at the edges.
 	 */

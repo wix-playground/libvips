@@ -315,24 +315,57 @@ reduceh_signed_int32_tab( VipsReduceh *reduceh,
 
 /* Ultra-high-quality version for double images.
  */
-template <typename T>
+template <typename T, int max_value>
 static void inline
 reduceh_notab( VipsReduceh *reduceh,
 	VipsPel *pout, const VipsPel *pin,
 	const int bands, double x )
 {
+	double coefficients[MAX_POINT];
+
+	vips_reduce_make_mask( coefficients, reduceh->kernel, reduceh->hshrink, x );
+
+	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
-	const int n = reduceh->n_point;
 
-	double cx[MAX_POINT];
+	for( int band = 0; band < bands; band++ ) {
+		if( !has_alpha || band == bands - 1 ) {
+			//No alpha blending
+			double sum = 0;
+			const T* restrict in_element = in + band;
 
-	vips_reduce_make_mask( cx, reduceh->kernel, reduceh->hshrink, x ); 
+			for( int y = 0; y < reduceh->n_point; y++ ) {
+				sum += coefficients[y] * in_element[0];
+				in_element += bands;
+			}
 
-	for( int z = 0; z < bands; z++ ) {
-		out[z] = reduce_sum<T, double>( in, bands, cx, n );
+			sum = VIPS_CLIP( 0, sum, max_value );
 
-		in += 1;
+			out[band] = sum;
+			continue;
+		}
+
+		//Alpha blending
+		const T* restrict in_element = in + band;
+		const T* restrict in_alpha_element = in + bands - 1;
+
+		double sum = 0;
+		double gamma = 0;
+		for( int x = 0; x < reduceh->n_point; x++ ) {
+			double alpha = (double)in_alpha_element[0] / max_value;
+			double multiplied_alpha = alpha * coefficients[x];
+
+			sum += multiplied_alpha * in_element[0];
+			gamma += multiplied_alpha;
+
+			in_element += bands;
+			in_alpha_element += bands;
+		}
+		gamma = reciprocal( gamma );
+
+		sum = VIPS_CLIP( 0, gamma * sum, max_value );
+		out[band] = sum;
 	}
 }
 
@@ -457,7 +490,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 			case VIPS_FORMAT_DOUBLE:
 			case VIPS_FORMAT_DPCOMPLEX:
-				reduceh_notab<double>( reduceh,
+				reduceh_notab<double, USHRT_MAX>( reduceh,
 					q, p, bands, X - ix );
 				break;
 
@@ -485,7 +518,7 @@ vips_reduceh_build( VipsObject *object )
 	VipsResample *resample = VIPS_RESAMPLE( object );
 	VipsReduceh *reduceh = (VipsReduceh *) object;
 	VipsImage **t = (VipsImage **) 
-		vips_object_local_array( object, 2 );
+		vips_object_local_array( object, 4 );
 
 	VipsImage *in;
 	int width;
@@ -544,6 +577,17 @@ vips_reduceh_build( VipsObject *object )
 	if( vips_image_decode( in, &t[0] ) )
 		return( -1 );
 	in = t[0];
+
+
+	//TEMP TEMP TEMP
+	if( vips_colourspace(in, &t[2], VIPS_INTERPRETATION_RGB16, NULL))
+		return( -1 );
+	in = t[2];
+
+	if( vips_cast_double(in, &t[3], NULL))
+		return( -1 );
+	in = t[3];
+	//TEMP TEMP TEMP
 
 	/* Add new pixels around the input so we can interpolate at the edges.
 	 * In centre mode, we read 0.5 pixels more to the right, so we must
