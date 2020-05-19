@@ -304,10 +304,18 @@ vips_sharpen_build( VipsObject *object )
 	                      config.interpretation, NULL ) )
 		return (-1);
 
-	if( vips_check_uncoded( class->nickname, input_in_new_interpretation ) ||
-	    vips_check_bands_atleast( class->nickname, input_in_new_interpretation,
+	//TEMP TEMP TEMP
+//	VipsImage *cast;
+//	if (vips_cast(input_in_new_interpretation, &cast, config.band_format, NULL))
+//		return (-1);
+//	vips_object_local( sharpen, cast );
+	//TEMP TEMP TEMP
+#define cast input_in_new_interpretation
+
+	if( vips_check_uncoded( class->nickname, cast ) ||
+	    vips_check_bands_atleast( class->nickname, cast,
 	                              3 ) ||
-	    vips_check_format( class->nickname, input_in_new_interpretation,
+	    vips_check_format( class->nickname, cast,
 	                       config.band_format ) )
 		return (-1);
 
@@ -328,15 +336,15 @@ vips_sharpen_build( VipsObject *object )
 	/* Extract the bands we want to sharpen
 	 */
 	for( i = 0; i < bands_to_sharpen; i++ )
-		if( vips_extract_band( input_in_new_interpretation,
+		if( vips_extract_band( cast,
 		                       &(bands_and_convolutions[i])[0], i, NULL ) )
 			return (-1);
 
 	/* Extract the other bands (if any)
 	 */
-	num_other_bands = input_in_new_interpretation->Bands - bands_to_sharpen;
+	num_other_bands = cast->Bands - bands_to_sharpen;
 	if( (num_other_bands > 0) &&
-	    vips_extract_band( input_in_new_interpretation, &other_bands,
+	    vips_extract_band(cast, &other_bands,
 	                       bands_to_sharpen,
 	                       "n", num_other_bands, NULL ) )
 		return (-1);

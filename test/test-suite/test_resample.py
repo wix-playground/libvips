@@ -174,19 +174,21 @@ class TestResample:
         im = pyvips.Image.new_from_file(filename)
         new_height = new_height or im.height * new_width / im.width
         print('new height %s' % new_height)
-        # im = im.colourspace('rgb16')
 
         kernel = 'approx-lanczos3'
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
         # im = im.crop(0, 0, 17, 3)
+        # im = im.premultiply()
         im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
+        # im = im.unpremultiply()
 
         print('Writing resized')
         im.write_to_file('%s.resized-lanczos.png' % filename)
         # im = im.thumbnail_image(328, linear=True)
         # im.write_to_file('%s.thumbnail-linear.png' % filename)
+        im = im.colourspace('rgb16')
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
         im.write_to_file('%s.resized-lanczos-sharpened.png' % filename)
 
