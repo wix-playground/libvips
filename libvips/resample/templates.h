@@ -28,6 +28,11 @@
 
  */
 
+
+#ifndef restrict
+#define restrict __restrict
+#endif
+
 /*
  * Various casts which assume that the data is already in range. (That
  * is, they are to be used with monotone samplers.)
@@ -441,13 +446,13 @@ calculate_coefficients_lanczos( double *c,
  */
 template <typename T, typename IT>
 static IT
-reduce_sum( const T * restrict in, int stride, const IT * restrict c, int n )
+reduce_sum( const T * restrict in, int stride, const IT * restrict coefficients, int n )
 {
 	IT sum;
 
 	sum = 0; 
 	for( int i = 0; i < n; i++ ) {
-		sum += c[i] * in[0];
+		sum += coefficients[i] * in[0];
 		in += stride;
 	}
 

@@ -381,28 +381,77 @@ vips_reducev_start( VipsImage *out, void *a, void *b )
 	return( seq );
 }
 
+static inline double reciprocal(const double x)
+{
+	const double EPSILON = 1.0e-12;
+
+	double
+		sign;
+
+	/*
+	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
+	*/
+	sign=x < 0.0 ? -1.0 : 1.0;
+	if ((sign*x) >= EPSILON)
+		return(1.0/x);
+	return(sign/EPSILON);
+}
+
 /* You'd think this would vectorise, but gcc hates mixed types in nested loops
  * :-(
  */
 template <typename T, int max_value>
 static void inline
-reducev_unsigned_int_tab( VipsReducev *reducev,
-	VipsPel *pout, const VipsPel *pin,
-	const int ne, const int lskip, const int * restrict cy )
+reducev_unsigned_int_tab( VipsReducev *reducev, VipsPel *pout,
+                          const VipsPel *pin, const int width_times_bands, const int lskip,
+                          const int *restrict coefficients, const int bands )
 {
+	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
-	const int n = reducev->n_point;
-	const int l1 = lskip / sizeof( T );
+	const int stride = lskip / sizeof( T );
 
-	for( int z = 0; z < ne; z++ ) {
-		int sum;
+	for( int x = 0; x < width_times_bands; x++ ) {
 
-		sum = reduce_sum<T, int>( in + z, l1, cy, n );
-		sum = unsigned_fixed_round( sum ); 
-		sum = VIPS_CLIP( 0, sum, max_value ); 
+		int band = x % bands;
 
-		out[z] = sum;
+		if( !has_alpha || band == bands - 1 ) {
+			//No alpha blending
+			int sum = 0;
+			const T *in_element = in + x;
+
+			for( int y = 0; y < reducev->n_point; y++ ) {
+				sum += coefficients[y] * in_element[0];
+				in_element += stride;
+			}
+
+			sum = signed_fixed_round( sum );
+			sum = VIPS_CLIP( 0, sum, max_value );
+
+			out[x] = sum;
+			continue;
+		}
+
+		//Alpha blending
+		const T *in_element = in + x;
+		const T *in_alpha_element = in + x - band + bands - 1;
+
+		double sum = 0;
+		double gamma = 0;
+		for( int y = 0; y < reducev->n_point; y++ ) {
+			double alpha = (double)in_alpha_element[0] / max_value;
+			double multiplied_alpha = alpha * coefficients[y];
+
+			sum += multiplied_alpha * in_element[0];
+			gamma += multiplied_alpha;
+			
+			in_element += stride;
+			in_alpha_element += stride;
+		}
+		gamma = reciprocal( gamma );
+
+		sum = VIPS_CLIP( 0, gamma * sum, max_value );
+		out[x] = sum;
 	}
 }
 
@@ -521,7 +570,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	 */
 	const int bands = in->Bands * 
 		(vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
-	int ne = r->width * bands;
+	int num_elements = r->width * bands;
 
 	VipsRect s;
 
@@ -545,13 +594,13 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		VipsPel *q = 
 			VIPS_REGION_ADDR( out_region, r->left, r->top + y );
 		const double Y = (r->top + y) * reducev->vshrink + 
-			(reducev->centre ? 0.5 : 0.0); 
+			(reducev->centre ? 0.5 : 0.0);
 		VipsPel *p = VIPS_REGION_ADDR( ir, r->left, (int) Y ); 
-		const int sy = Y * VIPS_TRANSFORM_SCALE * 2;
-		const int siy = sy & (VIPS_TRANSFORM_SCALE * 2 - 1);
-		const int ty = (siy + 1) >> 1;
-		const int *cyi = reducev->matrixi[ty];
-		const double *cyf = reducev->matrixf[ty];
+		const int scaled_y = Y * VIPS_TRANSFORM_SCALE * 2;
+		const int siy = scaled_y & (VIPS_TRANSFORM_SCALE * 2 - 1);
+		const int coefficients_index = (siy + 1) >> 1;
+		const int *coefficients_y_int = reducev->matrixi[coefficients_index];
+		const double *coefficients_y_float = reducev->matrixf[coefficients_index];
 		const int lskip = VIPS_REGION_LSKIP( ir );
 
 		switch( in->BandFmt ) {
@@ -559,54 +608,54 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			reducev_unsigned_int_tab
 				<unsigned char, UCHAR_MAX>(
 				reducev,
-				q, p, ne, lskip, cyi );
+				q, p, num_elements, lskip, coefficients_y_int, bands );
 			break;
 
 		case VIPS_FORMAT_CHAR:
 			reducev_signed_int_tab
 				<signed char, SCHAR_MIN, SCHAR_MAX>(
 				reducev,
-				q, p, ne, lskip, cyi );
+				q, p, num_elements, lskip, coefficients_y_int );
 			break;
 
 		case VIPS_FORMAT_USHORT:
 			reducev_unsigned_int_tab
 				<unsigned short, USHRT_MAX>(
 				reducev,
-				q, p, ne, lskip, cyi );
+				q, p, num_elements, lskip, coefficients_y_int, bands);
 			break;
 
 		case VIPS_FORMAT_SHORT:
 			reducev_signed_int_tab
 				<signed short, SHRT_MIN, SHRT_MAX>(
 				reducev,
-				q, p, ne, lskip, cyi );
+				q, p, num_elements, lskip, coefficients_y_int );
 			break;
 
 		case VIPS_FORMAT_UINT:
 			reducev_unsigned_int32_tab
 				<unsigned int, INT_MAX>(
 				reducev,
-				q, p, ne, lskip, cyf );
+				q, p, num_elements, lskip, coefficients_y_float );
 			break;
 
 		case VIPS_FORMAT_INT:
 			reducev_signed_int32_tab
 				<signed int, INT_MIN, INT_MAX>(
 				reducev,
-				q, p, ne, lskip, cyf );
+				q, p, num_elements, lskip, coefficients_y_float );
 			break;
 
 		case VIPS_FORMAT_FLOAT:
 		case VIPS_FORMAT_COMPLEX:
 			reducev_float_tab<float>( reducev,
-				q, p, ne, lskip, cyf );
+			                          q, p, num_elements, lskip, coefficients_y_float );
 			break;
 
 		case VIPS_FORMAT_DPCOMPLEX:
 		case VIPS_FORMAT_DOUBLE:
 			reducev_notab<double>( reducev,
-				q, p, ne, lskip, Y - (int) Y );
+			                       q, p, num_elements, lskip, Y - (int) Y );
 			break;
 
 		default:
@@ -778,12 +827,12 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 	/* Try to build a vector version, if we can.
 	 */
 	generate = vips_reducev_gen;
-	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
-		vips_vector_isenabled() &&
-		!vips_reducev_compile( reducev ) ) {
-		g_info( "reducev: using vector path" ); 
-		generate = vips_reducev_vector_gen;
-	}
+//	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
+//		vips_vector_isenabled() &&
+//		!vips_reducev_compile( reducev ) ) {
+//		g_info( "reducev: using vector path" );
+//		generate = vips_reducev_vector_gen;
+//	}
 
 	*out = vips_image_new();
 	if( vips_image_pipelinev( *out, 

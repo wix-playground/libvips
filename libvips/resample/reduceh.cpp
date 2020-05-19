@@ -91,7 +91,7 @@ extern "C" {
 G_DEFINE_TYPE( VipsReduceh, vips_reduceh, VIPS_TYPE_RESAMPLE );
 }
 
-/* Get n points. @shrink is the shrink factor, so 2 for a 50% reduction. 
+/* Get n points. @shrink is the shrink factor, so 2 for a 50% reduction.
  */
 int
 vips_reduce_get_points( VipsKernel kernel, double shrink ) 
@@ -160,24 +160,71 @@ vips_reduce_make_mask( double *c, VipsKernel kernel, double shrink, double x )
 	}
 }
 
+static inline double reciprocal(const double x)
+{
+	const double EPSILON = 1.0e-12;
+
+	double
+		sign;
+
+	/*
+	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
+	*/
+	sign=x < 0.0 ? -1.0 : 1.0;
+	if ((sign*x) >= EPSILON)
+		return(1.0/x);
+	return(sign/EPSILON);
+}
+
+
 template <typename T, int max_value>
 static void inline
 reduceh_unsigned_int_tab( VipsReduceh *reduceh,
 	VipsPel *pout, const VipsPel *pin,
-	const int bands, const int * restrict cx )
+	const int bands, const int * restrict coefficients )
 {
+	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
-	const int n = reduceh->n_point;
 
-	for( int z = 0; z < bands; z++ ) {
-		int sum;
-	       
-		sum = reduce_sum<T, int>( in + z, bands, cx, n );
-		sum = unsigned_fixed_round( sum ); 
-		sum = VIPS_CLIP( 0, sum, max_value ); 
+	for( int band = 0; band < bands; band++ ) {
+		if( !has_alpha || band == bands - 1 ) {
+			//No alpha blending
+			int sum = 0;
+			const T* restrict in_element = in + band;
 
-		out[z] = sum;
+			for( int y = 0; y < reduceh->n_point; y++ ) {
+				sum += coefficients[y] * in_element[0];
+				in_element += bands;
+			}
+
+			sum = unsigned_fixed_round( sum );
+			sum = VIPS_CLIP( 0, sum, max_value );
+
+			out[band] = sum;
+			continue;
+		}
+
+		//Alpha blending
+		const T* restrict in_element = in + band;
+		const T* restrict in_alpha_element = in + bands - 1;
+
+		double sum = 0;
+		double gamma = 0;
+		for( int x = 0; x < reduceh->n_point; x++ ) {
+			double alpha = (double)in_alpha_element[0] / max_value;
+			double multiplied_alpha = alpha * coefficients[x];
+
+			sum += multiplied_alpha * in_element[0];
+			gamma += multiplied_alpha;
+
+			in_element += bands;
+			in_alpha_element += bands;
+		}
+		gamma = reciprocal( gamma );
+
+		sum = VIPS_CLIP( 0, gamma * sum, max_value );
+		out[band] = sum;
 	}
 }
 
