@@ -173,7 +173,7 @@ class TestResample:
         # im = im.premultiply()
         # im = im.unpremultiply()
 
-        kernel = 'approx-lanczos3'
+        kernel = 'lanczos3'
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
@@ -262,7 +262,7 @@ class TestResample:
             # original is landscape
             assert im.width > im.height
 
-            # thumb should be portrait 
+            # thumb should be portrait
             assert thumb.width < thumb.height
             assert thumb.height == 100
 
