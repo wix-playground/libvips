@@ -569,7 +569,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		double bisect = (double) (y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  ir->valid.height );
+		                                  (double)ir->valid.height );
 		double weight[1000];
 		double density = 0;
 		int n;

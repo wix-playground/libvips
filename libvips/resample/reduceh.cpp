@@ -357,12 +357,12 @@ reduceh_notab_blend( VipsReduceh *reduceh,
 
 
 static int
-vips_reduceh_gen( VipsRegion *out_region, void *seq,
-                  void *a, void *b, gboolean *stop )
+vips_reduceh_gen( VipsRegion *out_region, void *in_region,
+                  void *in_image, void *in_reduceh, gboolean *stop )
 {
-	VipsImage *in = (VipsImage *) a;
-	VipsReduceh *reduceh = (VipsReduceh *) b;
-	VipsRegion *ir = (VipsRegion *) seq;
+	VipsImage *in = (VipsImage *) in_image;
+	VipsReduceh *reduceh = (VipsReduceh *) in_reduceh;
+	VipsRegion *ir = (VipsRegion *) in_region;
 	VipsRect *r = &out_region->valid;
 
 	/* Double bands for complex.
@@ -536,6 +536,15 @@ vips_reduceh_build( VipsObject *object )
 		return( -1 );
 	in = t[0];
 
+	//TEMP TEMP TEMP - TODO: support all interpretations instead of converting
+	VipsImage *converted_colorspace;
+	if (vips_colourspace(in, &converted_colorspace, VIPS_INTERPRETATION_RGB16))
+		return( -1 );
+
+	vips_object_local( object, converted_colorspace );
+	in = converted_colorspace;
+	//TEMP TEMP TEMP - TODO: support all interpretations instead of converting
+
 	/* Add new pixels around the input so we can interpolate at the edges.
 	 * In centre mode, we read 0.5 pixels more to the right, so we must
 	 * enlarge a little further.
@@ -550,9 +559,11 @@ vips_reduceh_build( VipsObject *object )
 //		return( -1 );
 //	in = t[1];
 
-	if( vips_image_pipelinev( resample->out,
-		VIPS_DEMAND_STYLE_THINSTRIP, in, (void *) NULL ) )
-		return( -1 );
+//	if( vips_image_pipelinev( resample->out,
+//		VIPS_DEMAND_STYLE_THINSTRIP, in, (void *) NULL ) )
+//		return( -1 );
+
+	resample->out = vips_image_new_memory();
 
 	/* Size output. We need to always round to nearest, so round(), not
 	 * rint().
@@ -561,13 +572,20 @@ vips_reduceh_build( VipsObject *object )
 	 * example, vipsthumbnail knows the true reduce factor (including the
 	 * fractional part), we just see the integer part here.
 	 */
-	resample->out->Xsize = VIPS_ROUND_UINT(
+	int out_width = VIPS_ROUND_UINT(
 		resample->in->Xsize / reduceh->hshrink );
+	resample->out->Xsize = out_width;
 	if( resample->out->Xsize <= 0 ) {
 		vips_error( object_class->nickname,
 			"%s", _( "image has shrunk to nothing" ) );
 		return( -1 );
 	}
+
+	vips_image_init_fields( resample->out,
+	                        out_width, in->Ysize, in->Bands,
+	                        in->BandFmt, VIPS_CODING_NONE,
+	                        in->Type,
+	                        in->Xres, in->Yres );
 
 #ifdef DEBUG
 	printf( "vips_reduceh_build: reducing %d x %d image to %d x %d\n",
@@ -578,12 +596,24 @@ vips_reduceh_build( VipsObject *object )
 	        in->Xsize, in->Ysize,
 	        resample->out->Xsize, resample->out->Ysize );
 
-	if( vips_image_generate( resample->out,
-		vips_start_one, vips_reduceh_gen, vips_stop_one,
-		in, reduceh ) )
-		return( -1 );
+//	if( vips_image_generate( resample->out,
+//		vips_start_one, vips_reduceh_gen, vips_stop_one,
+//		in, reduceh ) )
+//		return( -1 );
+	VipsRegion* in_region = vips_region_new(in);
+	VipsRect in_rect = {.height=in->Ysize, .width=in->Xsize};
+	if (vips_region_prepare(in_region, &in_rect))
+		return -1;
 
-	vips_reorder_margin_hint( resample->out, reduceh->n_point );
+	vips_image_write_prepare(resample->out);
+	VipsRegion* out_region = vips_region_new(resample->out);
+	VipsRect out_rect = {.height=in->Ysize, .width=out_width};
+	if (vips_region_prepare(out_region, &out_rect))
+		return -1;
+
+	if (vips_reduceh_gen(out_region, in_region, in, reduceh, NULL))
+		return -1;
+//	vips_reorder_margin_hint( resample->out, reduceh->n_point );
 
 	return( 0 );
 }
