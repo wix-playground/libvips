@@ -398,6 +398,7 @@ calculate_coefficients_cubic( double *c,
 		c[i] /= sum;
 }
 
+
 static double sinc_fast(double x)
 {
 	/*
