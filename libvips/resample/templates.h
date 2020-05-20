@@ -322,15 +322,15 @@ calculate_coefficients_catmull( double c[4], const double x )
  * from the interpolator as well as from the table builder.
  */
 static void inline
-calculate_coefficients_triangle( double *c, 
-	const double shrink, const double x )
+calculate_coefficients_triangle( double *c,
+                                 const double shrink, const double x )
 {
 	/* Needs to be in sync with vips_reduce_get_points().
 	 */
 	const int n_points = rint( 2 * shrink ) + 1;
 
 	int i;
-	double sum; 
+	double sum;
 
 	sum = 0;
 	for( i = 0; i < n_points; i++ ) {
@@ -339,19 +339,19 @@ calculate_coefficients_triangle( double *c,
 		double l;
 
 		l = 1.0 - VIPS_FABS( xp );
-		l = VIPS_MAX( 0.0, l ); 
+		l = VIPS_MAX( 0.0, l );
 
 		c[i] = l;
 		sum += l;
 	}
 
-	for( i = 0; i < n_points; i++ ) 
+	for( i = 0; i < n_points; i++ )
 		c[i] /= sum;
 }
 
 /* Generate a cubic filter. See:
  *
- * Mitchell and Netravali, Reconstruction Filters in Computer Graphics 
+ * Mitchell and Netravali, Reconstruction Filters in Computer Graphics
  * Computer Graphics, Volume 22, Number 4, August 1988.
  *
  * B = 1,   C = 0   - cubic B-spline
@@ -359,15 +359,15 @@ calculate_coefficients_triangle( double *c,
  * B = 0,   C = 1/2 - Catmull-Rom spline
  */
 static void inline
-calculate_coefficients_cubic( double *c, 
-	const double shrink, const double x, double B, double C )
+calculate_coefficients_cubic( double *c,
+                              const double shrink, const double x, double B, double C )
 {
 	/* Needs to be in sync with vips_reduce_get_points().
 	 */
 	const int n_points = rint( 4 * shrink ) + 1; 
 
 	int i;
-	double sum; 
+	double sum;
 
 	sum = 0;
 	for( i = 0; i < n_points; i++ ) {
@@ -378,23 +378,23 @@ calculate_coefficients_cubic( double *c,
 
 		double l;
 
-		if( axp <= 1 ) 
+		if( axp <= 1 )
 			l = ((12 - 9 * B - 6 * C) * axp3 +
-			     (-18 + 12 * B + 6 * C) * axp2 + 
+			     (-18 + 12 * B + 6 * C) * axp2 +
 			     (6 - 2 * B)) / 6;
 		else if( axp <= 2 )
 			l = ((-B - 6 * C) * axp3 +
-			     (6 * B + 30 * C) * axp2 + 
-			     (-12 * B - 48 * C) * axp + 
+			     (6 * B + 30 * C) * axp2 +
+			     (-12 * B - 48 * C) * axp +
 			     (8 * B + 24 * C)) / 6;
-		else 
+		else
 			l = 0.0;
 
 		c[i] = l;
 		sum += l;
 	}
 
-	for( i = 0; i < n_points; i++ ) 
+	for( i = 0; i < n_points; i++ )
 		c[i] /= sum;
 }
 
@@ -437,19 +437,19 @@ static double sinc_fast(double x)
 	/*
       Max. abs. rel. error 2.2e-8 < 1/2^25.
     */
-    const double c0 = 0.173611107357320220183368594093166520811e-2L;
-    const double c1 = -0.384240921114946632192116762889211361285e-3L;
-    const double c2 = 0.394201182359318128221229891724947048771e-4L;
-    const double c3 = -0.250963301609117217660068889165550534856e-5L;
-    const double c4 = 0.111902032818095784414237782071368805120e-6L;
-    const double c5 = -0.372895101408779549368465614321137048875e-8L;
-    const double c6 = 0.957694196677572570319816780188718518330e-10L;
-    const double c7 = -0.187208577776590710853865174371617338991e-11L;
-    const double c8 = 0.253524321426864752676094495396308636823e-13L;
-    const double c9 = -0.177084805010701112639035485248501049364e-15L;
-    const double p =
-      c0+xx*(c1+xx*(c2+xx*(c3+xx*(c4+xx*(c5+xx*(c6+xx*(c7+xx*(c8+xx*c9))))))));
-    return((xx-1.0)*(xx-4.0)*(xx-9.0)*(xx-16.0)*p);
+	const double c0 = 0.173611107357320220183368594093166520811e-2L;
+	const double c1 = -0.384240921114946632192116762889211361285e-3L;
+	const double c2 = 0.394201182359318128221229891724947048771e-4L;
+	const double c3 = -0.250963301609117217660068889165550534856e-5L;
+	const double c4 = 0.111902032818095784414237782071368805120e-6L;
+	const double c5 = -0.372895101408779549368465614321137048875e-8L;
+	const double c6 = 0.957694196677572570319816780188718518330e-10L;
+	const double c7 = -0.187208577776590710853865174371617338991e-11L;
+	const double c8 = 0.253524321426864752676094495396308636823e-13L;
+	const double c9 = -0.177084805010701112639035485248501049364e-15L;
+	const double p =
+		c0+xx*(c1+xx*(c2+xx*(c3+xx*(c4+xx*(c5+xx*(c6+xx*(c7+xx*(c8+xx*c9))))))));
+	return((xx-1.0)*(xx-4.0)*(xx-9.0)*(xx-16.0)*p);
 
 }
 
@@ -497,18 +497,18 @@ calculate_coefficients_approx_lanczos( double *c,
  *
  * @a is the number of lobes, so usually 2 or 3. @shrink is the reduction
  * factor, so 1 for interpolation, 2 for a x2 reduction, etc. We need more
- * points for large decimations to avoid aliasing. 
+ * points for large decimations to avoid aliasing.
  */
 static void inline
-calculate_coefficients_lanczos( double *c, 
-	const int a, const double shrink, const double x )
+calculate_coefficients_lanczos( double *c,
+                                const int a, const double shrink, const double x )
 {
 	/* Needs to be in sync with vips_reduce_get_points().
 	 */
-	const int n_points = rint( 2 * a * shrink ) + 1; 
+	const int n_points = rint( 2 * a * shrink ) + 1;
 
 	int i;
-	double sum; 
+	double sum;
 
 	sum = 0;
 	for( i = 0; i < n_points; i++ ) {
@@ -523,15 +523,15 @@ calculate_coefficients_lanczos( double *c,
 		else if( xp > a )
 			l = 0.0;
 		else
-			l = (double) a * sin( VIPS_PI * xp ) * 
-				sin( VIPS_PI * xp / (double) a ) / 
-				(VIPS_PI * VIPS_PI * xp * xp);
+			l = (double) a * sin( VIPS_PI * xp ) *
+			    sin( VIPS_PI * xp / (double) a ) /
+			    (VIPS_PI * VIPS_PI * xp * xp);
 
 		c[i] = l;
 		sum += l;
 	}
 
-	for( i = 0; i < n_points; i++ ) 
+	for( i = 0; i < n_points; i++ )
 		c[i] /= sum;
 }
 
@@ -540,13 +540,13 @@ calculate_coefficients_lanczos( double *c,
  */
 template <typename T, typename IT>
 static IT
-reduce_sum( const T * restrict in, int stride, const IT * restrict c, int n )
+reduce_sum( const T * restrict in, int stride, const IT * restrict coefficients, int n )
 {
 	IT sum;
 
 	sum = 0; 
 	for( int i = 0; i < n; i++ ) {
-		sum += c[i] * in[0];
+		sum += coefficients[i] * in[0];
 		in += stride;
 	}
 
