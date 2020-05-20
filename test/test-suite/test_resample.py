@@ -173,7 +173,7 @@ class TestResample:
         # im = im.premultiply()
         # im = im.unpremultiply()
 
-        kernel = 'lanczos3'
+        kernel = 'approx-lanczos3'
         # kernel = 'mitchell'
         # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)

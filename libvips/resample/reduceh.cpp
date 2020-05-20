@@ -113,7 +113,8 @@ vips_reduce_get_points( VipsKernel kernel, double shrink )
 		return( rint( 2 * 2 * shrink ) + 1 ); 
 
 	case VIPS_KERNEL_LANCZOS3:
-		return( rint( 2 * 3 * shrink ) + 1 ); 
+	case VIPS_KERNEL_APPROX_LANCZOS3:
+		return( rint( 2 * 3 * shrink ) + 1 );
 
 	default:
 		g_assert_not_reached();
@@ -151,7 +152,8 @@ vips_reduce_make_mask( double *c, VipsKernel kernel, double shrink, double x )
 		break;
 
 	case VIPS_KERNEL_LANCZOS3:
-		calculate_coefficients_lanczos( c, 3, shrink, x ); 
+	case VIPS_KERNEL_APPROX_LANCZOS3:
+		calculate_coefficients_lanczos( c, 3, shrink, x );
 		break;
 
 	default:
@@ -176,57 +178,78 @@ static inline double reciprocal(const double x)
 	return(sign/EPSILON);
 }
 
-
 template <typename T, int max_value>
 static void inline
 reduceh_unsigned_int_tab( VipsReduceh *reduceh,
-	VipsPel *pout, const VipsPel *pin,
-	const int bands, const int * restrict coefficients )
+                          VipsPel *pout, const VipsPel *pin,
+                          const int bands, const int * restrict cx )
 {
-	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
+	const int n = reduceh->n_point;
 
-	for( int band = 0; band < bands; band++ ) {
-		if( !has_alpha || band == bands - 1 ) {
-			//No alpha blending
-			int sum = 0;
-			const T* restrict in_element = in + band;
+	for( int z = 0; z < bands; z++ ) {
+		int sum;
 
-			for( int y = 0; y < reduceh->n_point; y++ ) {
-				sum += coefficients[y] * in_element[0];
-				in_element += bands;
-			}
+		sum = reduce_sum<T, int>( in + z, bands, cx, n );
+		sum = unsigned_fixed_round( sum );
+		sum = VIPS_CLIP( 0, sum, max_value );
 
-			sum = unsigned_fixed_round( sum );
-			sum = VIPS_CLIP( 0, sum, max_value );
-
-			out[band] = sum;
-			continue;
-		}
-
-		//Alpha blending
-		const T* restrict in_element = in + band;
-		const T* restrict in_alpha_element = in + bands - 1;
-
-		double sum = 0;
-		double gamma = 0;
-		for( int x = 0; x < reduceh->n_point; x++ ) {
-			double alpha = (double)in_alpha_element[0] / max_value;
-			double multiplied_alpha = alpha * coefficients[x];
-
-			sum += multiplied_alpha * in_element[0];
-			gamma += multiplied_alpha;
-
-			in_element += bands;
-			in_alpha_element += bands;
-		}
-		gamma = reciprocal( gamma );
-
-		sum = VIPS_CLIP( 0, gamma * sum, max_value );
-		out[band] = sum;
+		out[z] = sum;
 	}
 }
+
+//
+//template <typename T, int max_value>
+//static void inline
+//reduceh_unsigned_int_tab( VipsReduceh *reduceh,
+//	VipsPel *pout, const VipsPel *pin,
+//	const int bands, const int * restrict coefficients )
+//{
+//	const gboolean has_alpha = FALSE; //TODO: accept as parameter or something
+//	T* restrict out = (T *) pout;
+//	const T* restrict in = (T *) pin;
+//
+//	for( int band = 0; band < bands; band++ ) {
+//		if( !has_alpha || band == bands - 1 ) {
+//			//No alpha blending
+//			int sum = 0;
+//			const T* restrict in_element = in + band;
+//
+//			for( int y = 0; y < reduceh->n_point; y++ ) {
+//				sum += coefficients[y] * in_element[0];
+//				in_element += bands;
+//			}
+//
+//			sum = unsigned_fixed_round( sum );
+//			sum = VIPS_CLIP( 0, sum, max_value );
+//
+//			out[band] = sum;
+//			continue;
+//		}
+//
+//		//Alpha blending
+//		const T* restrict in_element = in + band;
+//		const T* restrict in_alpha_element = in + bands - 1;
+//
+//		double sum = 0;
+//		double gamma = 0;
+//		for( int x = 0; x < reduceh->n_point; x++ ) {
+//			double alpha = (double)in_alpha_element[0] / max_value;
+//			double multiplied_alpha = alpha * coefficients[x];
+//
+//			sum += multiplied_alpha * in_element[0];
+//			gamma += multiplied_alpha;
+//
+//			in_element += bands;
+//			in_alpha_element += bands;
+//		}
+//		gamma = reciprocal( gamma );
+//
+//		sum = VIPS_CLIP( 0, gamma * sum, max_value );
+//		out[band] = sum;
+//	}
+//}
 
 template <typename T, int min_value, int max_value>
 static void inline
@@ -325,7 +348,7 @@ reduceh_notab( VipsReduceh *reduceh,
 
 	vips_reduce_make_mask( coefficients, reduceh->kernel, reduceh->hshrink, x );
 
-	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
+	const gboolean has_alpha = FALSE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
 
@@ -580,13 +603,13 @@ vips_reduceh_build( VipsObject *object )
 
 
 	//TEMP TEMP TEMP
-	if( vips_colourspace(in, &t[2], VIPS_INTERPRETATION_RGB16, NULL))
-		return( -1 );
-	in = t[2];
-
-	if( vips_cast_double(in, &t[3], NULL))
-		return( -1 );
-	in = t[3];
+//	if( vips_colourspace(in, &t[2], VIPS_INTERPRETATION_RGB16, NULL))
+//		return( -1 );
+//	in = t[2];
+//
+//	if( vips_cast_double(in, &t[3], NULL))
+//		return( -1 );
+//	in = t[3];
 	//TEMP TEMP TEMP
 
 	/* Add new pixels around the input so we can interpolate at the edges.

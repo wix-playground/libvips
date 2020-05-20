@@ -406,7 +406,7 @@ reducev_unsigned_int_tab( VipsReducev *reducev, VipsPel *pout,
                           const VipsPel *pin, const int width_times_bands, const int lskip,
                           const int *restrict coefficients, const int bands )
 {
-	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
+	const gboolean has_alpha = FALSE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
 	const int stride = lskip / sizeof( T );
@@ -546,7 +546,7 @@ reducev_notab( VipsReducev *reducev,
 	double coefficients[MAX_POINT];
 	vips_reduce_make_mask( coefficients, reducev->kernel, reducev->vshrink, y );
 
-	const gboolean has_alpha = TRUE; //TODO: accept as parameter or something
+	const gboolean has_alpha = FALSE; //TODO: accept as parameter or something
 	T* restrict out = (T *) pout;
 	const T* restrict in = (T *) pin;
 	const int stride = lskip / sizeof( T );
@@ -947,13 +947,13 @@ vips_reducev_build( VipsObject *object )
 	in = t[0];
 
 	//TEMP TEMP TEMP
-	if( vips_colourspace(in, &t[4], VIPS_INTERPRETATION_RGB16, NULL))
-		return( -1 );
-	in = t[4];
-
-	if( vips_cast_double(in, &t[5], NULL))
-		return( -1 );
-	in = t[5];
+//	if( vips_colourspace(in, &t[4], VIPS_INTERPRETATION_RGB16, NULL))
+//		return( -1 );
+//	in = t[4];
+//
+//	if( vips_cast_double(in, &t[5], NULL))
+//		return( -1 );
+//	in = t[5];
 	//TEMP TEMP TEMP
 
 	/* Add new pixels around the input so we can interpolate at the edges.
