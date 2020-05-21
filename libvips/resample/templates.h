@@ -359,7 +359,7 @@ calculate_coefficients_cubic( double *c,
 {
 	/* Needs to be in sync with vips_reduce_get_points().
 	 */
-	const int n_points = 2 * rint( 2 * shrink ) + 1; 
+	const int n_points = 2 * rint( 2 * shrink ) + 1;
 	const double half = x + n_points / 2.0 - 1;
 
 	int i;
@@ -408,7 +408,7 @@ calculate_coefficients_lanczos( double *c,
 {
 	/* Needs to be in sync with vips_reduce_get_points().
 	 */
-	const int n_points = 2 * rint( a * shrink ) + 1; 
+	const int n_points = 2 * rint( a * shrink ) + 1;
 	const double half = x + n_points / 2.0 - 1;
 
 	int i;
