@@ -1,8 +1,8 @@
 /* Cored sharpen of LABQ image.
- * 
+ *
  * Returns 0 on success and -1 on error
  *
- * Copyright: 1995 A. Abbood 
+ * Copyright: 1995 A. Abbood
  * Author: A. Abbood
  * Written on: 30/01/1995
  * 15/5/95 JC
@@ -22,7 +22,7 @@
  *	- fix for band extract index changed
  * 21/4/04
  *	- switched to gaussian mask and radius
- * 20/11/04 
+ * 20/11/04
  *	- uses extract_bands() to remove and reattach ab for slight speedup
  *	- accepts LabS as well as LabQ for slight speedup
  *	- small code tidies
@@ -181,74 +181,74 @@ vips_sharpen_class_init( VipsSharpenClass *class )
 	operation_class->flags = VIPS_OPERATION_SEQUENTIAL;
 
 	VIPS_ARG_IMAGE( class, "in", 1,
-					_( "Input" ),
-					_( "Input image" ),
-					VIPS_ARGUMENT_REQUIRED_INPUT,
-					G_STRUCT_OFFSET( VipsSharpen, in ) );
+	                _( "Input" ),
+	                _( "Input image" ),
+	                VIPS_ARGUMENT_REQUIRED_INPUT,
+	                G_STRUCT_OFFSET( VipsSharpen, in ) );
 
 	VIPS_ARG_IMAGE( class, "out", 2,
-					_( "Output" ),
-					_( "Output image" ),
-					VIPS_ARGUMENT_REQUIRED_OUTPUT,
-					G_STRUCT_OFFSET( VipsSharpen, out ) );
+	                _( "Output" ),
+	                _( "Output image" ),
+	                VIPS_ARGUMENT_REQUIRED_OUTPUT,
+	                G_STRUCT_OFFSET( VipsSharpen, out ) );
 
 	VIPS_ARG_DOUBLE( class, "sigma", 3,
-					 _( "Sigma" ),
-					 _( "Sigma of Gaussian" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, sigma ),
-					 0.000001, 10000.0, 0.5 );
+	                 _( "Sigma" ),
+	                 _( "Sigma of Gaussian" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, sigma ),
+	                 0.000001, 10000.0, 0.5 );
 
 	VIPS_ARG_DOUBLE( class, "x1", 5,
-					 _( "x1" ),
-					 _( "Flat/jaggy threshold" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, x1 ),
-					 0, 1000000, 2.0 );
+	                 _( "x1" ),
+	                 _( "Flat/jaggy threshold" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, x1 ),
+	                 0, 1000000, 2.0 );
 
 	VIPS_ARG_DOUBLE( class, "y2", 6,
-					 _( "y2" ),
-					 _( "Maximum brightening" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, y2 ),
-					 0, 1000000, 10 );
+	                 _( "y2" ),
+	                 _( "Maximum brightening" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, y2 ),
+	                 0, 1000000, 10 );
 
 	VIPS_ARG_DOUBLE( class, "y3", 7,
-					 _( "y3" ),
-					 _( "Maximum darkening" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, y3 ),
-					 0, 1000000, 20 );
+	                 _( "y3" ),
+	                 _( "Maximum darkening" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, y3 ),
+	                 0, 1000000, 20 );
 
 	VIPS_ARG_DOUBLE( class, "m1", 8,
-					 _( "m1" ),
-					 _( "Slope for flat areas" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, m1 ),
-					 0, 1000000, 0.0 );
+	                 _( "m1" ),
+	                 _( "Slope for flat areas" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, m1 ),
+	                 0, 1000000, 0.0 );
 
 	VIPS_ARG_DOUBLE( class, "m2", 9,
-					 _( "m2" ),
-					 _( "Slope for jaggy areas" ),
-					 VIPS_ARGUMENT_OPTIONAL_INPUT,
-					 G_STRUCT_OFFSET( VipsSharpen, m2 ),
-					 0, 1000000, 3.0 );
+	                 _( "m2" ),
+	                 _( "Slope for jaggy areas" ),
+	                 VIPS_ARGUMENT_OPTIONAL_INPUT,
+	                 G_STRUCT_OFFSET( VipsSharpen, m2 ),
+	                 0, 1000000, 3.0 );
 
 	VIPS_ARG_ENUM( class, "mode", 10,
-				   _( "Mode" ),
-				   _( "Sharpen mode" ),
-				   VIPS_ARGUMENT_OPTIONAL_INPUT,
-				   G_STRUCT_OFFSET( VipsSharpen, mode ),
-				   VIPS_TYPE_SHARPEN_MODE, VIPS_SHARPEN_MODE_LUMINESCENCE );
+	               _( "Mode" ),
+	               _( "Sharpen mode" ),
+	               VIPS_ARGUMENT_OPTIONAL_INPUT,
+	               G_STRUCT_OFFSET( VipsSharpen, mode ),
+	               VIPS_TYPE_SHARPEN_MODE, VIPS_SHARPEN_MODE_LUMINESCENCE );
 
 	/* We used to have a radius control.
 	 */
 	VIPS_ARG_INT( class, "radius", 3,
-				  _( "Radius" ),
-				  _( "radius of Gaussian" ),
-				  VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-				  G_STRUCT_OFFSET( VipsSharpen, radius ),
-				  1, 100, 1 );
+	              _( "Radius" ),
+	              _( "radius of Gaussian" ),
+	              VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
+	              G_STRUCT_OFFSET( VipsSharpen, radius ),
+	              1, 100, 1 );
 
 }
 
@@ -304,10 +304,17 @@ vips_sharpen_build( VipsObject *object )
 	                      config.interpretation, NULL ) )
 		return (-1);
 
-	if( vips_check_uncoded( class->nickname, input_in_new_interpretation ) ||
-	    vips_check_bands_atleast( class->nickname, input_in_new_interpretation,
+	//TEMP TEMP TEMP
+	VipsImage *cast;
+	if (vips_cast(input_in_new_interpretation, &cast, config.band_format, NULL))
+		return (-1);
+	vips_object_local( sharpen, cast );
+	//TEMP TEMP TEMP
+
+	if( vips_check_uncoded( class->nickname, cast ) ||
+	    vips_check_bands_atleast( class->nickname, cast,
 	                              3 ) ||
-	    vips_check_format( class->nickname, input_in_new_interpretation,
+	    vips_check_format( class->nickname, cast,
 	                       config.band_format ) )
 		return (-1);
 
@@ -328,17 +335,17 @@ vips_sharpen_build( VipsObject *object )
 	/* Extract the bands we want to sharpen
 	 */
 	for( i = 0; i < bands_to_sharpen; i++ )
-		if( vips_extract_band( input_in_new_interpretation,
+		if( vips_extract_band( cast,
 		                       &(bands_and_convolutions[i])[0], i, NULL ) )
 			return (-1);
 
 	/* Extract the other bands (if any)
 	 */
-	num_other_bands = input_in_new_interpretation->Bands - bands_to_sharpen;
+	num_other_bands = cast->Bands - bands_to_sharpen;
 	if( (num_other_bands > 0) &&
-	    vips_extract_band( input_in_new_interpretation, &other_bands,
-	                       bands_to_sharpen,
-	                       "n", num_other_bands, NULL ) )
+	    vips_extract_band(cast, &other_bands,
+	                      bands_to_sharpen,
+	                      "n", num_other_bands, NULL ) )
 		return (-1);
 
 	/* Convolve
@@ -471,7 +478,7 @@ vips_sharpen_build_kernel_rgb( VipsSharpen *sharpen,
 	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( sharpen );
 	double sigma = sharpen->sigma * KERNEL_RANK;
 	double sig2 = 2 * sigma * sigma;
-	double radius = 2 * sharpen->sigma - 1;
+	double radius = sharpen->sigma; //2 * sharpen->sigma - 1;
 	int width = 2 * VIPS_CEIL( radius ) + 1;
 	double sum = 0;
 	double normalize = 20 / (SQRT_2_PI * sigma);
@@ -832,14 +839,14 @@ vips_sharpen_generate_rgb8( VipsRegion *or,
  *   m2 == 3          (some sharpening in jaggy areas)
  * ]|
  *
- * If you want more or less sharpening, we suggest you just change the 
- * m2 parameter. 
+ * If you want more or less sharpening, we suggest you just change the
+ * m2 parameter.
  *
- * The @sigma parameter changes the width of the fringe and can be 
- * adjusted according to the output printing resolution. As an approximate 
- * guideline, use 0.5 for 4 pixels/mm (display resolution), 
- * 1.0 for 12 pixels/mm and 1.5 for 16 pixels/mm (300 dpi == 12 
- * pixels/mm). These figures refer to the image raster, not the half-tone 
+ * The @sigma parameter changes the width of the fringe and can be
+ * adjusted according to the output printing resolution. As an approximate
+ * guideline, use 0.5 for 4 pixels/mm (display resolution),
+ * 1.0 for 12 pixels/mm and 1.5 for 16 pixels/mm (300 dpi == 12
+ * pixels/mm). These figures refer to the image raster, not the half-tone
  * resolution.
  *
  * RGB Mode:
@@ -855,7 +862,7 @@ vips_sharpen_generate_rgb8( VipsRegion *or,
  *
  *
  * See also: vips_conv().
- * 
+ *
  * Returns: 0 on success, -1 on error.
  */
 int

@@ -776,12 +776,12 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 	/* Try to build a vector version, if we can.
 	 */
 	generate = vips_reducev_gen;
-	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
-		vips_vector_isenabled() &&
-		!vips_reducev_compile( reducev ) ) {
-		g_info( "reducev: using vector path" ); 
-		generate = vips_reducev_vector_gen;
-	}
+//	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
+//		vips_vector_isenabled() &&
+//		!vips_reducev_compile( reducev ) ) {
+//		g_info( "reducev: using vector path" );
+//		generate = vips_reducev_vector_gen;
+//	}
 
 	*out = vips_image_new();
 	if( vips_image_pipelinev( *out, 

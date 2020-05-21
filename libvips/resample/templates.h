@@ -28,6 +28,10 @@
 
  */
 
+#ifndef restrict
+#define restrict __restrict
+#endif
+
 /*
  * Various casts which assume that the data is already in range. (That
  * is, they are to be used with monotone samplers.)
