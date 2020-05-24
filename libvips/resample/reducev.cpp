@@ -558,23 +558,33 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	scale = reciprocal(scale);
 
 	for( int y = 0; y < r->height; y ++ ) {
-		double bisect = (double) (y + 0.5) / scale + EPSILON;
+		double bisect = (double) (r->top + y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
 		                                  in->Ysize);
+		int n = stop - start;
 		double weight[1000];
 		double density = 0;
-		int n;
-
-		for( n = 0; n < (stop - start); n++ ) {
-			double wy = VIPS_ABS(
-				scale * ((double) (start + n) - bisect + 0.5) );
-			weight[n] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
-			density += weight[n];
-		}
 
 		if( n == 0 )
 			continue;
+
+		s.left = r->left;
+		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
+		s.width = r->width;
+		s.height = n;
+		if( vips_region_prepare( ir, &s ) )
+			return( -1 );
+
+		for( int i = 0; i < n; i++ ) {
+			double bisect_wy = (double) (y + 0.5) / scale + EPSILON;
+			size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
+
+			double wy = VIPS_ABS(
+				scale * ((double) (start_wy + i) - bisect_wy + 0.5) );
+			weight[i] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
+			density += weight[i];
+		}
 
 		if( (density != 0.0) && (density != 1.0) ) {
 			/*
@@ -586,12 +596,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 
-		s.left = r->left;
-		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
-		s.width = r->width;
-		s.height = n;
-		if( vips_region_prepare( ir, &s ) )
-			return( -1 );
+
 
 		for( int x = 0; x < r->width; x++ ) {
 			for( int i = 0; i < bands; i++ ) {
