@@ -562,24 +562,28 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
 		                                  in->Ysize);
-		int n = stop - start;
 		double weight[1000];
 		double density = 0;
+		int n = stop - start;
 
 		if( n == 0 )
 			continue;
 
 		s.left = r->left;
-		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
+		s.top = start;
 		s.width = r->width;
 		s.height = n;
 		if( vips_region_prepare( ir, &s ) )
 			return( -1 );
+		if ( ir->valid.height < n) {
+			printf("Didn't get what we asked for - wanted %d but got %d :( \n", n, ir->valid.height);
+//			abort();
+		}
+
+		double bisect_wy = (double) (y + 0.5) / scale + EPSILON;
+		size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
 
 		for( int i = 0; i < n; i++ ) {
-			double bisect_wy = (double) (y + 0.5) / scale + EPSILON;
-			size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
-
 			double wy = VIPS_ABS(
 				scale * ((double) (start_wy + i) - bisect_wy + 0.5) );
 			weight[i] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
@@ -596,8 +600,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 
-
-
 		for( int x = 0; x < r->width; x++ ) {
 			for( int i = 0; i < bands; i++ ) {
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
@@ -609,12 +611,12 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-						const T* src = (const T*)VIPS_REGION_ADDR(ir,
+						const T* p = (const T*)VIPS_REGION_ADDR( ir,
 							r->left + x, s.top + j);
-						pixel += weight[j] * src[i];
+						pixel += weight[j] * p[i];
 					}
 
-					q[i] = (T) VIPS_CLIP(0, pixel, max_value);
+					q[i] = (T) VIPS_CLIP(0, pixel, max_value );
 //					printf( "%f,%f,%f,%f,%d\n",
 //					        weight[0],
 //					        weight[1],
@@ -629,10 +631,10 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					const T* src = (const T*)VIPS_REGION_ADDR(ir,
+					const T* p = (const T*)VIPS_REGION_ADDR( ir,
 						r->left + x, s.top + j);
-					T alpha_value = src[bands - 1];
-					T pixel_value = src[i];
+					T alpha_value = p[bands - 1];
+					T pixel_value = p[i];
 
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
@@ -650,7 +652,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 	}
-
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" ); 
 

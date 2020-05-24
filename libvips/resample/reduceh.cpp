@@ -389,23 +389,37 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	double scale = reciprocal(reduceh->hshrink);
 
 	for( int x = 0; x < r->width; x++ ) {
-		double bisect = (double) (x + 0.5) / scale + EPSILON;
+		double bisect = (double) (r->left + x + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
 		                                  in->Xsize );
 		double weight[1000];
 		double density = 0;
-		int n;
-
-		for( n = 0; n < (stop - start); n++ ) {
-			double wx = VIPS_ABS(
-				scale * ((double) (start + n) - (bisect) + 0.5) );
-			weight[n] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
-			density += weight[n];
-		}
+		int n = stop - start;
 
 		if( n == 0 )
 			continue;
+
+		s.left = start;
+		s.top = r->top;
+		s.width = n;
+		s.height = r->height;
+		if( vips_region_prepare( ir, &s ) )
+			return (-1);
+		if ( ir->valid.width < n) {
+			printf("Didn't get what we asked for - wanted %d but got %d :( \n", n, ir->valid.width);
+//			abort();
+		}
+
+		double bisect_wx = (double) (x + 0.5) / scale + EPSILON;
+		size_t start_wx = (ssize_t) VIPS_MAX( bisect_wx - support + 0.5, 0.0 );
+
+		for( int i = 0; i < n; i++ ) {
+			double wx = VIPS_ABS(
+				scale * ((double) (start_wx + i) - bisect_wx + 0.5) );
+			weight[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
+			density += weight[i];
+		}
 
 		if( (density != 0.0) && (density != 1.0) ) {
 			/*
@@ -416,13 +430,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				weight[i] *= density;
 			}
 		}
-
-		s.left = (ssize_t) VIPS_MAX( (double) (r->left + x + 0.5) / scale - support + 0.5, 0.0 );
-		s.top = r->top;
-		s.width = n;
-		s.height = r->height;
-		if( vips_region_prepare( ir, &s ) )
-			return (-1);
 
 		for( int y = 0; y < r->height; y++ ) {
 			for( int i = 0; i < bands; i++ ) {
@@ -435,12 +442,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-						const T* src = (const T*)VIPS_REGION_ADDR(ir,
+						const T* p = (const T*)VIPS_REGION_ADDR( ir,
 							s.left + j, r->top + y);
-						pixel += weight[j] * src[i];
+						pixel += weight[j] * p[i];
 					}
 
-					q[i] = (T) VIPS_CLIP( 0, pixel, max_value );
+					q[i] = (T) VIPS_CLIP(0, pixel, max_value );
 //					printf( "%f,%f,%f,%f,%d\n",
 //					        weight[0],
 //					        weight[1],
@@ -455,10 +462,10 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					const T* src = (const T*)VIPS_REGION_ADDR(ir,
+					const T* p = (const T*)VIPS_REGION_ADDR( ir,
 						s.left + j, r->top + y);
-					T alpha_value = src[bands - 1];
-					T pixel_value = src[i];
+					T alpha_value = p[bands - 1];
+					T pixel_value = p[i];
 
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
@@ -473,7 +480,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 //				        weight[2],
 //				        weight[3],
 //				        q[i] );
-
 			}
 		}
 	}
