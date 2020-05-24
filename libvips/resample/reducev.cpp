@@ -527,9 +527,9 @@ static int
 vips_reducev_gen( VipsRegion *out_region, void *vseq,
                   void *void_in, void *void_reducev, gboolean *stop )
 {
+	Sequence *seq = (Sequence *) vseq;
 	VipsImage *in = (VipsImage *) void_in;
 	VipsReducev *reducev = (VipsReducev *) void_reducev;
-	Sequence *seq = (Sequence *) vseq;
 	VipsRegion *ir = seq->ir;
 	VipsRect *r = &out_region->valid;
 
@@ -537,7 +537,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	 */
 	const int bands = in->Bands * 
 		(vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
-	int ne = r->width * bands;
 
 	VipsRect s;
 
@@ -545,12 +544,10 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top ); 
 #endif /*DEBUG*/
-
 	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
 	        r->width, r->height, r->left, r->top );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
-
 	int resize_filter_support = 3;
 	double resize_filter_scale = (1.0/3.0);
 	double scale=reducev->vshrink;
@@ -565,7 +562,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
 		                                  in->Ysize);
-
 		double weight[1000];
 		double density = 0;
 		int n;
@@ -580,13 +576,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		if( n == 0 )
 			continue;
 
-		s.left = r->left;
-		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
-		s.width = r->width;
-		s.height = n;
-		if( vips_region_prepare( ir, &s ) )
-			return( -1 );
-
 		if( (density != 0.0) && (density != 1.0) ) {
 			/*
 			  Normalize.
@@ -597,7 +586,12 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 
-		const T *p = (const T*)VIPS_REGION_ADDR( ir, r->left, r->top + start );
+		s.left = r->left;
+		s.top = (ssize_t) VIPS_MAX( (double) (r->top + y + 0.5) / scale - support + 0.5, 0.0 );
+		s.width = r->width;
+		s.height = n;
+		if( vips_region_prepare( ir, &s ) )
+			return( -1 );
 
 		for( int x = 0; x < r->width; x++ ) {
 			for( int i = 0; i < bands; i++ ) {
@@ -609,15 +603,13 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					/*
 					  No alpha blending.
 					*/
-
 					for( int j = 0; j < n; j++ ) {
-//						int k = j * ir->valid.width + x;
-//						pixel += weight[j] * p[k * bands + i];
-						const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, s.top + j);
+						const T* src = (const T*)VIPS_REGION_ADDR(ir,
+							r->left + x, s.top + j);
 						pixel += weight[j] * src[i];
 					}
 
-					q[i] = VIPS_CLIP(0, pixel, max_value);
+					q[i] = (T) VIPS_CLIP(0, pixel, max_value);
 //					printf( "%f,%f,%f,%f,%d\n",
 //					        weight[0],
 //					        weight[1],
@@ -632,12 +624,11 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		        */
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
-//					int k = j * ir->valid.width + x;
-//					T alpha_value = p[k * bands + bands - 1];
-//					T pixel_value = p[k * bands + i];
-					const T* src = (const T*)VIPS_REGION_ADDR(ir, r->left + x, s.top + j);
+					const T* src = (const T*)VIPS_REGION_ADDR(ir,
+						r->left + x, s.top + j);
 					T alpha_value = src[bands - 1];
 					T pixel_value = src[i];
+
 					double alpha = (1.0 / max_value) * alpha_value;
 					pixel += alpha * weight[j] * pixel_value;
 					gamma += alpha * weight[j];
@@ -868,20 +859,6 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		vips_reducev_start, generate, vips_reducev_stop,
 		in, reducev ) )
 		return( -1 );
-//	VipsRegion* in_region = vips_region_new(in);
-//	VipsRect in_rect = {.height=in->Ysize, .width=in->Xsize};
-//	if (vips_region_prepare(in_region, &in_rect))
-//		return -1;
-//
-//	vips_image_write_prepare(*out);
-//	VipsRegion* out_region = vips_region_new(*out);
-//	VipsRect out_rect = {.height=out_height, .width=in->Xsize};
-//	if (vips_region_prepare(out_region, &out_rect))
-//		return -1;
-//
-//	Sequence seq={.reducev=reducev, .ir=in_region};
-//	if (vips_reducev_gen(out_region, &seq, in, reducev, NULL))
-//		return -1;
 
 //	vips_reorder_margin_hint( *out, reducev->n_point );
 

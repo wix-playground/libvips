@@ -163,6 +163,22 @@ class TestResample:
     def test_resize_and_sharpen_zetta(self):
         self.resize_and_sharpen(IMAGES + '/zetta.png', 436.0)
 
+    def test_resize_and_sharpen_olhos(self):
+        # 828 × 322 -> 402 x 156
+        self.resize_and_sharpen(IMAGES + '/olhos.png', 402.0, 156.0)
+
+    def test_sharpen_resized_by_magick_olhos(self):
+        # 828 × 322 -> 402 x 156
+        self.sharpen(IMAGES + '/olhos-resized-by-magick.png')
+
+    def test_resize_and_sharpen_olhos__only_horizontal(self):
+        # 828 × 322 -> 402 x 322
+        self.resize_and_sharpen(IMAGES + '/olhos-h.png', 402.0, 322.0)
+
+    def test_resize_and_sharpen_olhos__only_vertical(self):
+        # 828 × 322 -> 828 × 156
+        self.resize_and_sharpen(IMAGES + '/olhos-v.png', 828.0, 156.0)
+
     def test_resize_and_sharpen_tiny(self):
         self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
 
@@ -189,6 +205,13 @@ class TestResample:
         # im.write_to_file('%s.thumbnail-linear.png' % filename)
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
         im.write_to_file('%s.resized-lanczos-sharpened.png' % filename)
+
+    @staticmethod
+    def sharpen(filename):
+        im = pyvips.Image.new_from_file(filename)
+        im = im.colourspace('rgb16')
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s-sharpened.png' % filename)
 
     def test_thumbnail_logo3(self):
         filename = IMAGES + '/logo3.png'
