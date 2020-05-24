@@ -233,25 +233,48 @@ vips_resize_build( VipsObject *object )
 
 	/* Any residual downsizing.
 	 */
-	if( vscale < 1.0 ) { 
-		g_info( "residual reducev by %g", vscale );
-		if( vips_reducev( in, &t[2], 1.0 / vscale, 
-			"kernel", resize->kernel, 
-			"centre", FALSE,
-			NULL ) )  
-			return( -1 );
-		in = t[2];
-	}
+	if (hscale > vscale) {
+		if( hscale < 1.0 ) {
+			g_info( "residual reduceh by %g",
+			        hscale );
+			if( vips_reduceh( in, &t[3], 1.0 / hscale,
+			                  "kernel", resize->kernel,
+			                  "centre", FALSE,
+			                  NULL ) )
+				return (-1);
+			in = t[3];
+		}
 
-	if( hscale < 1.0 ) { 
-		g_info( "residual reduceh by %g", 
-			hscale );
-		if( vips_reduceh( in, &t[3], 1.0 / hscale, 
-			"kernel", resize->kernel, 
-			"centre", FALSE,
-			NULL ) )  
-			return( -1 );
-		in = t[3];
+		if( vscale < 1.0 ) {
+			g_info( "residual reducev by %g", vscale );
+			if( vips_reducev( in, &t[2], 1.0 / vscale,
+			                  "kernel", resize->kernel,
+			                  "centre", FALSE,
+			                  NULL ) )
+				return (-1);
+			in = t[2];
+		}
+	} else {
+		if( vscale < 1.0 ) {
+			g_info( "residual reducev by %g", vscale );
+			if( vips_reducev( in, &t[2], 1.0 / vscale,
+			                  "kernel", resize->kernel,
+			                  "centre", FALSE,
+			                  NULL ) )
+				return (-1);
+			in = t[2];
+		}
+
+		if( hscale < 1.0 ) {
+			g_info( "residual reduceh by %g",
+			        hscale );
+			if( vips_reduceh( in, &t[3], 1.0 / hscale,
+			                  "kernel", resize->kernel,
+			                  "centre", FALSE,
+			                  NULL ) )
+				return (-1);
+			in = t[3];
+		}
 	}
 
 	/* Any upsizing.
