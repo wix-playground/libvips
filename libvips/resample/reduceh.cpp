@@ -411,7 +411,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 //			abort();
 		}
 
-		double bisect_wx = (double) (x + 0.5) / scale + EPSILON;
+		double bisect_wx = (double) (r->left + x + 0.5) / scale + EPSILON;
 		size_t start_wx = (ssize_t) VIPS_MAX( bisect_wx - support + 0.5, 0.0 );
 
 		for( int i = 0; i < n; i++ ) {

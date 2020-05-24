@@ -580,9 +580,9 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 //			abort();
 		}
 
-		double bisect_wy = (double) (y + 0.5) / scale + EPSILON;
+		double bisect_wy = (double) (r->top + y + 0.5) / scale + EPSILON;
 		size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
-
+		
 		for( int i = 0; i < n; i++ ) {
 			double wy = VIPS_ABS(
 				scale * ((double) (start_wy + i) - bisect_wy + 0.5) );
@@ -652,7 +652,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 	}
-
+	
 	VIPS_GATE_STOP( "vips_reducev_gen: work" ); 
 
 	VIPS_COUNT_PIXELS( out_region, "vips_reducev_gen" ); 
@@ -705,7 +705,7 @@ vips_reducev_vector_gen( VipsRegion *out_region, void *vseq,
 		VipsPel *q = 
 			VIPS_REGION_ADDR( out_region, r->left, r->top + y );
 		const double Y = (r->top + y) * reducev->vshrink + 
-			(reducev->centre ? 0.5 : 0.0); 
+			(reducev->centre ? 0.5 : 0.0);
 		const int py = (int) Y; 
 		const int sy = Y * VIPS_TRANSFORM_SCALE * 2;
 		const int siy = sy & (VIPS_TRANSFORM_SCALE * 2 - 1);

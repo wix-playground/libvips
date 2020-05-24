@@ -179,17 +179,17 @@ class TestResample:
         # 828 × 322 -> 828 × 156
         self.resize_and_sharpen(IMAGES + '/olhos-v.png', 828.0, 156.0)
 
-    def test_resize_and_sharpen_17x17(self):
+    def test_resize_and_sharpen_40x40(self):
         # 828 × 322 -> 402 x 156
-        self.resize_and_sharpen(IMAGES + '/17x17.png', 13.0)
+        self.resize_and_sharpen(IMAGES + '/40x40.png', 39.0)
 
-    def test_resize_and_sharpen_17x17__only_horizontal(self):
+    def test_resize_and_sharpen_40x40__only_horizontal(self):
         # 828 × 322 -> 402 x 322
-        self.resize_and_sharpen(IMAGES + '/17x17-h.png', 402.0, 322.0)
+        self.resize_and_sharpen(IMAGES + '/40x40-h.png', 39.0, 40.0)
 
-    def test_resize_and_sharpen_17x17__only_vertical(self):
+    def test_resize_and_sharpen_40x40__only_vertical(self):
         # 828 × 322 -> 828 × 156
-        self.resize_and_sharpen(IMAGES + '/17x17-v.png', 828.0, 156.0)
+        self.resize_and_sharpen(IMAGES + '/40x40-v.png', 40.0, 39.0)
 
     def test_resize_and_sharpen_tiny(self):
         self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
@@ -205,16 +205,11 @@ class TestResample:
         im = im.colourspace('rgb16')
 
         kernel = 'approx-lanczos3'
-        # kernel = 'mitchell'
-        # im = im.reduce(1 / (328.0 / 2382.0), 1 / (328.0 / 2382.0), kernel=kernel)
         print('new_width / im.width=', new_width / im.width)
-        # im = im.crop(0, 0, 17, 3)
         im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
 
         print('Writing resized')
         im.write_to_file('%s.resized-lanczos.png' % filename)
-        # im = im.thumbnail_image(328, linear=True)
-        # im.write_to_file('%s.thumbnail-linear.png' % filename)
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
         im.write_to_file('%s.resized-lanczos-sharpened.png' % filename)
 
