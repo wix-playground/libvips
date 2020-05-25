@@ -228,16 +228,6 @@ class TestResample:
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
         im.write_to_file('%s.thumbnail-linear-sharpened.png' % filename)
 
-    def test_resize_logo3_solid_bg__lanczos3(self):
-        im = pyvips.Image.new_from_file(IMAGES + '/logo3-solid-bg.png')
-        im = im.premultiply()
-        kernel = 'lanczos3'
-        # kernel = 'mitchell'
-        im = im.resize(328.0 / 2382.0, kernel=kernel)
-        im = im.unpremultiply()
-        im = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
-        im.write_to_file('%s.resized-lanczos.png' % LOGO3_PNG_FILE)
-
     def test_shrink(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)
         im2 = im.shrink(4, 4)
