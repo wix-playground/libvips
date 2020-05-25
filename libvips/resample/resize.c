@@ -239,7 +239,7 @@ vips_resize_build( VipsObject *object )
 			        hscale );
 			if( vips_reduceh( in, &t[3], 1.0 / hscale,
 			                  "kernel", resize->kernel,
-			                  "centre", FALSE,
+			                  "centre", TRUE,
 			                  NULL ) )
 				return (-1);
 			in = t[3];
@@ -249,7 +249,7 @@ vips_resize_build( VipsObject *object )
 			g_info( "residual reducev by %g", vscale );
 			if( vips_reducev( in, &t[2], 1.0 / vscale,
 			                  "kernel", resize->kernel,
-			                  "centre", FALSE,
+			                  "centre", TRUE,
 			                  NULL ) )
 				return (-1);
 			in = t[2];
@@ -259,7 +259,7 @@ vips_resize_build( VipsObject *object )
 			g_info( "residual reducev by %g", vscale );
 			if( vips_reducev( in, &t[2], 1.0 / vscale,
 			                  "kernel", resize->kernel,
-			                  "centre", FALSE,
+			                  "centre", TRUE,
 			                  NULL ) )
 				return (-1);
 			in = t[2];
@@ -270,7 +270,7 @@ vips_resize_build( VipsObject *object )
 			        hscale );
 			if( vips_reduceh( in, &t[3], 1.0 / hscale,
 			                  "kernel", resize->kernel,
-			                  "centre", FALSE,
+			                  "centre", TRUE,
 			                  NULL ) )
 				return (-1);
 			in = t[3];

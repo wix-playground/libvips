@@ -376,8 +376,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top );
 #endif /*DEBUG*/
-	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
-	        r->width, r->height, r->left, r->top );
+//	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
+//	        r->width, r->height, r->left, r->top );
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 	int resize_filter_support = 3;

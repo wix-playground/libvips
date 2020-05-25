@@ -544,8 +544,8 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top ); 
 #endif /*DEBUG*/
-	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
-	        r->width, r->height, r->left, r->top );
+//	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+//	        r->width, r->height, r->left, r->top );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 	int resize_filter_support = 3;
@@ -575,6 +575,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 		s.height = n;
 		if( vips_region_prepare( ir, &s ) )
 			return( -1 );
+
 		if ( ir->valid.height < n) {
 			printf("Didn't get what we asked for - wanted %d but got %d :( \n", n, ir->valid.height);
 //			abort();
