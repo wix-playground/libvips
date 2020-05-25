@@ -557,6 +557,26 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 	const int max_value = USHRT_MAX;
 	scale = reciprocal(scale);
 
+	double first_bisect = (double)(r->top + 0 + 0.5) / scale + EPSILON;
+	size_t first_start = (ssize_t) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
+
+	double last_bisect = (double)(r->top + r->height - 1 + 0.5) / scale + EPSILON;
+	size_t last_stop = (ssize_t) VIPS_MIN( last_bisect + support + 0.5,
+	                                        in->Ysize);
+
+	s.left = r->left;
+	s.top = first_start;
+	s.width = r->width;
+	s.height = (int)(last_stop - first_start);
+	if( vips_region_prepare( ir, &s ) )
+		return( -1 );
+
+	if ( ir->valid.height < s.height) {
+		printf("Didn't get what we asked for - wanted height %d but got %d :( \n",
+			s.height, ir->valid.height);
+//			abort();
+	}
+
 	for( int y = 0; y < r->height; y ++ ) {
 		double bisect = (double) (r->top + y + 0.5) / scale + EPSILON;
 		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
@@ -568,18 +588,6 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 
 		if( n == 0 )
 			continue;
-
-		s.left = r->left;
-		s.top = start;
-		s.width = r->width;
-		s.height = n;
-		if( vips_region_prepare( ir, &s ) )
-			return( -1 );
-
-		if ( ir->valid.height < n) {
-			printf("Didn't get what we asked for - wanted %d but got %d :( \n", n, ir->valid.height);
-//			abort();
-		}
 
 		double bisect_wy = (double) (r->top + y + 0.5) / scale + EPSILON;
 		size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
@@ -613,7 +621,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-							r->left + x, s.top + j);
+							r->left + x, start + j);
 						pixel += weight[j] * p[i];
 					}
 
@@ -633,7 +641,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						r->left + x, s.top + j);
+						r->left + x, start + j);
 					T alpha_value = p[bands - 1];
 					T pixel_value = p[i];
 

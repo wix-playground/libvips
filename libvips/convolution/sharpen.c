@@ -321,7 +321,7 @@ vips_sharpen_build( VipsObject *object )
 
 #ifdef DEBUG
 	printf( "sharpen: blurring with:\n" );
-	vips_matrixprint( kernel, NULL );
+	vips_matrixprint( config.kernel, NULL );
 #endif /*DEBUG*/
 
 	int bands_to_sharpen = VIPS_MIN( input_in_new_interpretation->Bands,
@@ -616,7 +616,7 @@ vips_sharpen_build_lut( const VipsSharpen *sharpen )
 	{
 		VipsImage *mat = vips_image_new_matrix(65536, 1);
 		for( i = 0; i < 65536; i++ )
-			*VIPS_MATRIX(mat, i1, 0) = lut[i];
+			*VIPS_MATRIX(mat, i, 0) = lut[i];
 		vips_image_write_to_file(mat, "x.v", NULL);
 		printf("lut written to x.v\n");
 		g_object_unref(mat);

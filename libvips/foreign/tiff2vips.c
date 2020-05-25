@@ -2632,7 +2632,7 @@ vips__tiff_read_source( VipsSource *source, VipsImage *out,
 
 #ifdef DEBUG
 	printf( "tiff2vips: libtiff version is \"%s\"\n", TIFFGetVersion() );
-	printf( "tiff2vips: libtiff starting for buffer %p\n", buf );
+//	printf( "tiff2vips: libtiff starting for buffer %p\n", buf );
 #endif /*DEBUG*/
 
 	vips__tiff_init();
