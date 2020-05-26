@@ -535,66 +535,61 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 
 	/* Double bands for complex.
 	 */
-	const int bands = in->Bands * 
-		(vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
+	const int bands = in->Bands *
+	                  (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
 
-	VipsRect s;
-
-#ifdef DEBUG
-	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
-		r->width, r->height, r->left, r->top ); 
-#endif /*DEBUG*/
-//	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
-//	        r->width, r->height, r->left, r->top );
-
-	VIPS_GATE_START( "vips_reducev_gen: work" );
 	int resize_filter_support = 3;
 	double resize_filter_scale = (1.0/3.0);
-	double scale=reducev->vshrink;
-	double support = scale * resize_filter_support;
+	double support = reducev->vshrink * resize_filter_support;
 
 	typedef unsigned short T;
 	const int max_value = USHRT_MAX;
-	scale = reciprocal(scale);
+	double scale = reciprocal(reducev->vshrink);
 
 	double first_bisect = (double)(r->top + 0 + 0.5) / scale + EPSILON;
-	size_t first_start = (ssize_t) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
+	int first_start = VIPS_MAX( first_bisect - support + 0.5, 0.0 );
 
 	double last_bisect = (double)(r->top + r->height - 1 + 0.5) / scale + EPSILON;
-	size_t last_stop = (ssize_t) VIPS_MIN( last_bisect + support + 0.5,
-	                                        in->Ysize);
+	int last_stop = VIPS_MIN( last_bisect + support + 0.5, in->Ysize);
+	VipsRect s = {
+		.left = r->left,
+		.top = first_start,
+		.width = r->width,
+		.height = last_stop - first_start,
+	};
 
-	s.left = r->left;
-	s.top = first_start;
-	s.width = r->width;
-	s.height = (int)(last_stop - first_start);
+#ifdef DEBUG
+	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+		r->width, r->height, r->left, r->top );
+#endif /*DEBUG*/
+	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
+
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
 	if ( ir->valid.height < s.height) {
-		printf("Didn't get what we asked for - wanted height %d but got %d :( \n",
-			s.height, ir->valid.height);
+		printf( "Didn't get what we asked for - wanted height %d but got %d :( \n",
+		        s.height, ir->valid.height);
 //			abort();
 	}
 
+	double *weight = (double*)alloca(sizeof(double) * (last_stop - first_start));
+
+	VIPS_GATE_START( "vips_reducev_gen: work" );
+
 	for( int y = 0; y < r->height; y ++ ) {
 		double bisect = (double) (r->top + y + 0.5) / scale + EPSILON;
-		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  in->Ysize);
-		double weight[1000];
+		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
+		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
 		double density = 0;
 		int n = stop - start;
 
 		if( n == 0 )
 			continue;
 
-		double bisect_wy = (double) (r->top + y + 0.5) / scale + EPSILON;
-		size_t start_wy = (ssize_t) VIPS_MAX( bisect_wy - support + 0.5, 0.0 );
-		
 		for( int i = 0; i < n; i++ ) {
-			double wy = VIPS_ABS(
-				scale * ((double) (start_wy + i) - bisect_wy + 0.5) );
+			double wy = VIPS_ABS(scale * ((double) start + i - bisect + 0.5) );
 			weight[i] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
 			density += weight[i];
 		}
@@ -621,7 +616,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-							r->left + x, start + j);
+						                                         r->left + x, start + j);
 						pixel += weight[j] * p[i];
 					}
 
@@ -641,7 +636,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						r->left + x, start + j);
+					                                         r->left + x, start + j);
 					T alpha_value = p[bands - 1];
 					T pixel_value = p[i];
 
@@ -661,10 +656,10 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 			}
 		}
 	}
-	
-	VIPS_GATE_STOP( "vips_reducev_gen: work" ); 
 
-	VIPS_COUNT_PIXELS( out_region, "vips_reducev_gen" ); 
+	VIPS_GATE_STOP( "vips_reducev_gen: work" );
+
+	VIPS_COUNT_PIXELS( out_region, "vips_reducev_gen" );
 
 	return( 0 );
 }

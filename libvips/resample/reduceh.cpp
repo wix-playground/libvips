@@ -355,7 +355,6 @@ reduceh_notab_blend( VipsReduceh *reduceh,
 	out[band] = (T)VIPS_CLIP(0, sum, max_value);
 }
 
-
 static int
 vips_reduceh_gen( VipsRegion *out_region, void *seq,
                   void *a, void *b, gboolean *stop )
@@ -368,18 +367,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	/* Double bands for complex.
 	 */
 	const int bands = in->Bands *
-		(vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
+	                  (vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
 
-	VipsRect s;
-
-#ifdef DEBUG
-	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
-		r->width, r->height, r->left, r->top );
-#endif /*DEBUG*/
-//	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
-//	        r->width, r->height, r->left, r->top );
-
-	VIPS_GATE_START( "vips_reduceh_gen: work" );
 	int resize_filter_support = 3;
 	double resize_filter_scale = (1.0/3.0);
 	double support = reduceh->hshrink * resize_filter_support;
@@ -389,42 +378,48 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	double scale = reciprocal(reduceh->hshrink);
 
 	double first_bisect = (double) (r->left + 0 + 0.5) / scale + EPSILON;
-	size_t first_start = (ssize_t) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
+	int first_start = (int) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
 
 	double last_bisect = (double) (r->left + r->width - 1 + 0.5) / scale + EPSILON;
-	size_t last_stop = (ssize_t) VIPS_MIN( last_bisect + support + 0.5,
-	                                  in->Xsize );
+	int last_stop = (int) VIPS_MIN( last_bisect + support + 0.5, in->Xsize );
+	VipsRect s = {
+		.left = first_start,
+		.top = r->top,
+		.width = last_stop - first_start,
+		.height = r->height,
+	};
 
-	s.left = first_start;
-	s.top = r->top;
-	s.width = last_stop - first_start;
-	s.height = r->height;
+#ifdef DEBUG
+	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
+		r->width, r->height, r->left, r->top );
+#endif /*DEBUG*/
+	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
+	        r->width, r->height, r->left, r->top );
+
 	if( vips_region_prepare( ir, &s ) )
 		return (-1);
+
 	if ( ir->valid.width < s.width) {
 		printf("Didn't get what we asked for - wanted width %d but got %d :( \n", s.width, ir->valid.width);
 //			abort();
 	}
 
+	double *weight = (double*)alloca(sizeof(double) * (last_stop - first_start));
+
+	VIPS_GATE_START( "vips_reduceh_gen: work" );
+
 	for( int x = 0; x < r->width; x++ ) {
 		double bisect = (double) (r->left + x + 0.5) / scale + EPSILON;
-		size_t start = (ssize_t) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		size_t stop = (ssize_t) VIPS_MIN( bisect + support + 0.5,
-		                                  in->Xsize );
-		double weight[1000];
+		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
+		int stop = (int) VIPS_MIN( bisect + support + 0.5,in->Xsize );
 		double density = 0;
 		int n = stop - start;
 
 		if( n == 0 )
 			continue;
 
-
-		double bisect_wx = (double) (r->left + x + 0.5) / scale + EPSILON;
-		size_t start_wx = (ssize_t) VIPS_MAX( bisect_wx - support + 0.5, 0.0 );
-
 		for( int i = 0; i < n; i++ ) {
-			double wx = VIPS_ABS(
-				scale * ((double) (start_wx + i) - bisect_wx + 0.5) );
+			double wx = VIPS_ABS(scale * ((double) (start + i) - bisect + 0.5) );
 			weight[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
 			density += weight[i];
 		}
@@ -451,7 +446,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-							start + j, r->top + y);
+						                                         start + j, r->top + y);
 						pixel += weight[j] * p[i];
 					}
 
@@ -471,7 +466,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						start + j, r->top + y);
+					                                         start + j, r->top + y);
 					T alpha_value = p[bands - 1];
 					T pixel_value = p[i];
 
