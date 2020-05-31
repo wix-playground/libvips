@@ -418,6 +418,10 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 			}
 		}
 
+		const int sizeof_pixel = VIPS_IMAGE_SIZEOF_PEL(in);
+		const int lskip = VIPS_REGION_LSKIP( ir );
+		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
+
 		for( int y = 0; y < r->height; y++ ) {
 			for( int i = 0; i < bands; i++ ) {
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
@@ -429,18 +433,15 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-							start + j, r->top + y);
-						pixel += weight[j] * p[i];
+//						const T* p = (const T*)VIPS_REGION_ADDR( ir,
+//							start + j, r->top + y);
+						const T* source_pixel = (const T*)p;
+						pixel += weight[j] * source_pixel[i];
+						p += sizeof_pixel;
 					}
 
 					q[i] = (T) VIPS_CLIP(0, pixel, max_value );
-//					printf( "%f,%f,%f,%f,%d\n",
-//					        weight[0],
-//					        weight[1],
-//					        weight[2],
-//					        weight[3],
-//					        q[i] );
+
 					continue;
 				}
 
@@ -459,16 +460,11 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					gamma += alpha * weight[j];
 				}
 				q[i] = VIPS_CLIP( 0,  pixel / gamma, max_value );
+			} // for i
 
-//				printf( "%f,%f,%f,%f,%d\n",
-//				        weight[0],
-//				        weight[1],
-//				        weight[2],
-//				        weight[3],
-//				        q[i] );
-			}
-		}
-	}
+			p += lskip - n * sizeof_pixel;
+		} // for y
+	} // for x
 
 	VIPS_GATE_STOP( "vips_reduceh_gen: work" );
 
@@ -487,7 +483,6 @@ vips_reduceh_build( VipsObject *object )
 		vips_object_local_array( object, 2 );
 
 	VipsImage *in;
-	int width;
 
 	if( VIPS_OBJECT_CLASS( vips_reduceh_parent_class )->build( object ) )
 		return( -1 );
