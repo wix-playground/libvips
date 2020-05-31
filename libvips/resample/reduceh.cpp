@@ -353,8 +353,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	/* Double bands for complex.
 	 */
-	const int bands = in->Bands *
-	                  (vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
+	const int num_bands = in->Bands *
+	                      (vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
 
 	int resize_filter_support = 3;
 	double resize_filter_scale = (1.0/3.0);
@@ -418,29 +418,29 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 			}
 		}
 
-		const int sizeof_pixel = VIPS_IMAGE_SIZEOF_PEL(in);
 		const int lskip = VIPS_REGION_LSKIP( ir );
 		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
+		int alpha_index = num_bands - 1;
 
 		for( int y = 0; y < r->height; y++ ) {
-			for( int i = 0; i < bands; i++ ) {
+			for( int band_index = 0; band_index < num_bands; band_index++ ) {
+				const T* source_bands = (const T*)p;
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
 				                               r->top + y );
-				double pixel = 0;
+				double destination_pixel = 0;
 
-				if( !vips_image_hasalpha(in) || i == bands - 1 ) {
+				if( !vips_image_hasalpha( in) || band_index == alpha_index ) {
 					/*
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
-//						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-//							start + j, r->top + y);
-						const T* source_pixel = (const T*)p;
-						pixel += weight[j] * source_pixel[i];
-						p += sizeof_pixel;
+						T source_pixel = source_bands[band_index];
+						destination_pixel += weight[j] * source_pixel;
+
+						source_bands += num_bands;
 					}
 
-					q[i] = (T) VIPS_CLIP(0, pixel, max_value );
+					q[band_index] = (T) VIPS_CLIP( 0, destination_pixel, max_value );
 
 					continue;
 				}
@@ -448,21 +448,21 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				/*
 		          Alpha blending.
 		        */
-				double gamma = 0.0;
+				double alpha_sum = 0.0;
 				for( int j = 0; j < n; j++ ) {
-					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						start + j, r->top + y);
-					T alpha_value = p[bands - 1];
-					T pixel_value = p[i];
+					T source_alpha = source_bands[alpha_index];
+					T source_pixel = source_bands[band_index];
 
-					double alpha = (1.0 / max_value) * alpha_value;
-					pixel += alpha * weight[j] * pixel_value;
-					gamma += alpha * weight[j];
+					double alpha = weight[j] * source_alpha / max_value;
+					destination_pixel += alpha * source_pixel;
+					alpha_sum += alpha;
+
+					source_bands += num_bands;
 				}
-				q[i] = VIPS_CLIP( 0,  pixel / gamma, max_value );
+				q[band_index] = VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
 			} // for i
 
-			p += lskip - n * sizeof_pixel;
+			p += lskip;
 		} // for y
 	} // for x
 
