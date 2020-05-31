@@ -299,19 +299,6 @@ reduceh_notab( VipsReduceh *reduceh,
 
 #define EPSILON  (1.0e-12)
 
-static inline double reciprocal(const double x)
-{
-	double sign;
-
-	/*
-	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
-	*/
-	sign=x < 0.0 ? -1.0 : 1.0;
-	if ((sign*x) >= EPSILON)
-		return (1.0/x);
-	return (sign/EPSILON);
-}
-
 template <typename T, int max_value>
 static void inline
 reduceh_notab_blend( VipsReduceh *reduceh,
@@ -343,7 +330,7 @@ reduceh_notab_blend( VipsReduceh *reduceh,
 			normalize += alpha;
 		}
 //		normalize = 1;
-		out[band] = (T)VIPS_CLIP(0, sum * reciprocal( normalize), max_value);
+		out[band] = (T)VIPS_CLIP(0, sum / normalize, max_value);
 	}
 
 	double sum = 0;
@@ -425,7 +412,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 			/*
 			  Normalize.
 			*/
-			density = reciprocal( density );
+			density = 1 / density;
 			for( int i = 0; i < n; i++ ) {
 				weight[i] *= density;
 			}
@@ -471,8 +458,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					pixel += alpha * weight[j] * pixel_value;
 					gamma += alpha * weight[j];
 				}
-				gamma = reciprocal( gamma );
-				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
+				q[i] = VIPS_CLIP( 0,  pixel / gamma, max_value );
 
 //				printf( "%f,%f,%f,%f,%d\n",
 //				        weight[0],
