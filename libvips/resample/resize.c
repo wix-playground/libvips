@@ -171,7 +171,7 @@ vips_resize_build( VipsObject *object )
 	VipsResample *resample = VIPS_RESAMPLE( object );
 	VipsResize *resize = (VipsResize *) object;
 
-	VipsImage **t = (VipsImage **) vips_object_local_array( object, 7 );
+	VipsImage **t = (VipsImage **) vips_object_local_array( object, 9 );
 
 	VipsImage *in;
 	double hscale;
@@ -198,8 +198,8 @@ vips_resize_build( VipsObject *object )
 	int_vshrink = vips_resize_int_shrink( resize, vscale );
 
 	//temp temp temp
-	int_hshrink = 1;
-	int_vshrink = 1;
+//	int_hshrink = 1;
+//	int_vshrink = 1;
 	//temp temp temp
 
 	/* Unpack for processing.
@@ -207,6 +207,12 @@ vips_resize_build( VipsObject *object )
 	if( vips_image_decode( in, &t[5] ) )
 		return( -1 );
 	in = t[5];
+
+	if( int_vshrink > 1 || int_hshrink > 1) {
+		if( vips_premultiply( in, &t[7], NULL ) )
+			return (-1);
+		in = t[7];
+	}
 
 	if( int_vshrink > 1 ) { 
 		g_info( "shrinkv by %d", int_vshrink );
@@ -224,6 +230,12 @@ vips_resize_build( VipsObject *object )
 		in = t[1];
 
 		hscale *= int_hshrink;
+	}
+
+	if( int_vshrink > 1 || int_hshrink > 1) {
+		if( vips_unpremultiply( in, &t[8], NULL ) )
+			return (-1);
+		in = t[8];
 	}
 
 	/* Don't let either axis drop below 1 px.
