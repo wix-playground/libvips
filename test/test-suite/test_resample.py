@@ -198,7 +198,7 @@ class TestResample:
         self.resize_and_sharpen(IMAGES + '/two-strip.png', 16.0)
 
     def test_resize_and_sharpen_1024_to_16(self):
-        for i in range(1000):
+        for i in range(1):
             print('----- Iteration %s' % i)
             self.resize_and_sharpen(IMAGES + '/1024x1024.png', 16.0)
 
