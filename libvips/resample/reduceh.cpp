@@ -375,12 +375,13 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	typedef unsigned short T;
 	const int max_value = USHRT_MAX;
-	double scale = reciprocal(reduceh->hshrink);
 
-	double first_bisect = (double) (r->left + 0 + 0.5) / scale + EPSILON;
+	double first_bisect = (double) (r->left + 0 + 0.5) *
+		reduceh->hshrink + EPSILON;
 	int first_start = (int) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
 
-	double last_bisect = (double) (r->left + r->width - 1 + 0.5) / scale + EPSILON;
+	double last_bisect = (double) (r->left + r->width - 1 + 0.5) *
+		reduceh->hshrink + EPSILON;
 	int last_stop = (int) VIPS_MIN( last_bisect + support + 0.5, in->Xsize );
 	VipsRect s = {
 		.left = first_start,
@@ -399,17 +400,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	if( vips_region_prepare( ir, &s ) )
 		return (-1);
 
-	if ( ir->valid.width < s.width) {
-		printf("Didn't get what we asked for - wanted width %d but got %d :( \n", s.width, ir->valid.width);
-//			abort();
-	}
-
 	double *weight = (double*)alloca(sizeof(double) * (last_stop - first_start));
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 
 	for( int x = 0; x < r->width; x++ ) {
-		double bisect = (double) (r->left + x + 0.5) / scale + EPSILON;
+		double bisect = (double) (r->left + x + 0.5) * reduceh->hshrink + EPSILON;
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5,in->Xsize );
 		double density = 0;
@@ -419,7 +415,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 			continue;
 
 		for( int i = 0; i < n; i++ ) {
-			double wx = VIPS_ABS(scale * ((double) (start + i) - bisect + 0.5) );
+			double wx = VIPS_ABS(
+				((double) (start + i) - bisect + 0.5) / reduceh->hshrink);
 			weight[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
 			density += weight[i];
 		}
@@ -446,7 +443,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						                                         start + j, r->top + y);
+							start + j, r->top + y);
 						pixel += weight[j] * p[i];
 					}
 
@@ -466,7 +463,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-					                                         start + j, r->top + y);
+						start + j, r->top + y);
 					T alpha_value = p[bands - 1];
 					T pixel_value = p[i];
 
