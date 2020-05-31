@@ -524,13 +524,12 @@ static inline double reciprocal(const double x)
 }
 
 static int
-vips_reducev_gen( VipsRegion *out_region, void *vseq,
+vips_reducev_gen( VipsRegion *out_region, void *seq,
                   void *void_in, void *void_reducev, gboolean *stop )
 {
-	Sequence *seq = (Sequence *) vseq;
 	VipsImage *in = (VipsImage *) void_in;
 	VipsReducev *reducev = (VipsReducev *) void_reducev;
-	VipsRegion *ir = seq->ir;
+	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
 
 	/* Double bands for complex.
@@ -616,7 +615,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						                                         r->left + x, start + j);
+							r->left + x, start + j);
 						pixel += weight[j] * p[i];
 					}
 
@@ -636,7 +635,7 @@ vips_reducev_gen( VipsRegion *out_region, void *vseq,
 				double gamma = 0.0;
 				for( int j = 0; j < n; j++ ) {
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-					                                         r->left + x, start + j);
+						r->left + x, start + j);
 					T alpha_value = p[bands - 1];
 					T pixel_value = p[i];
 
@@ -819,13 +818,13 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 
 	/* Try to build a vector version, if we can.
 	 */
-	generate = vips_reducev_gen;
-	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
-		vips_vector_isenabled() &&
-		!vips_reducev_compile( reducev ) ) {
-		g_info( "reducev: using vector path" ); 
-		generate = vips_reducev_vector_gen;
-	}
+//	generate = vips_reducev_gen;
+//	if( in->BandFmt == VIPS_FORMAT_UCHAR &&
+//		vips_vector_isenabled() &&
+//		!vips_reducev_compile( reducev ) ) {
+//		g_info( "reducev: using vector path" );
+//		generate = vips_reducev_vector_gen;
+//	}
 
 //	*out = vips_image_new_memory();
 	*out = vips_image_new();
@@ -849,13 +848,6 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 		return( -1 );
 	}
 
-//	vips_image_init_fields( *out,
-//	                        in->Xsize, out_height, in->Bands,
-//	                        in->BandFmt, VIPS_CODING_NONE,
-//	                        in->Type,
-//	                        in->Xres, in->Yres );
-
-
 #ifdef DEBUG
 	printf( "vips_reducev_build: reducing %d x %d image to %d x %d\n", 
 		in->Xsize, in->Ysize, 
@@ -866,7 +858,7 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 	        (*out)->Xsize, (*out)->Ysize );
 
 	if( vips_image_generate( *out,
-		vips_reducev_start, generate, vips_reducev_stop,
+		vips_start_one, vips_reducev_gen, vips_stop_one,
 		in, reducev ) )
 		return( -1 );
 
@@ -884,7 +876,6 @@ vips_reducev_build( VipsObject *object )
 	VipsImage **t = (VipsImage **) vips_object_local_array( object, 4 );
 
 	VipsImage *in;
-	int height;
 
 	if( VIPS_OBJECT_CLASS( vips_reducev_parent_class )->build( object ) )
 		return( -1 );

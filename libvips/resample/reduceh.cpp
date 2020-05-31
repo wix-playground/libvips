@@ -357,10 +357,10 @@ reduceh_notab_blend( VipsReduceh *reduceh,
 
 static int
 vips_reduceh_gen( VipsRegion *out_region, void *seq,
-                  void *a, void *b, gboolean *stop )
+                  void *void_in, void *void_reduceh, gboolean *stop )
 {
-	VipsImage *in = (VipsImage *) a;
-	VipsReduceh *reduceh = (VipsReduceh *) b;
+	VipsImage *in = (VipsImage *) void_in;
+	VipsReduceh *reduceh = (VipsReduceh *) void_reduceh;
 	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
 

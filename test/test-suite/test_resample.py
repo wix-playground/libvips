@@ -197,12 +197,17 @@ class TestResample:
     def test_resize_and_sharpen_two_strip(self):
         self.resize_and_sharpen(IMAGES + '/two-strip.png', 16.0)
 
+    def test_resize_and_sharpen_1024_to_16(self):
+        for i in range(1000):
+            print('----- Iteration %s' % i)
+            self.resize_and_sharpen(IMAGES + '/1024x1024.png', 16.0)
+
     @staticmethod
     def resize_and_sharpen(filename, new_width, new_height=None):
         im = pyvips.Image.new_from_file(filename)
         new_height = new_height or im.height * new_width / im.width
         print('new height %s' % new_height)
-        im = im.colourspace('rgb16')
+        # im = im.colourspace('rgb16')
 
         kernel = 'approx-lanczos3'
         print('new_width / im.width=', new_width / im.width)

@@ -198,8 +198,8 @@ vips_resize_build( VipsObject *object )
 	int_vshrink = vips_resize_int_shrink( resize, vscale );
 
 	//temp temp temp
-	int_hshrink = 1;
-	int_vshrink = 1;
+//	int_hshrink = 1;
+//	int_vshrink = 1;
 	//temp temp temp
 
 	/* Unpack for processing.
@@ -230,6 +230,11 @@ vips_resize_build( VipsObject *object )
 	 */
 	hscale = VIPS_MAX( hscale, 1.0 / in->Xsize );
 	vscale = VIPS_MAX( vscale, 1.0 / in->Ysize );
+
+	//TODO: Don't convert colorspace, support all interpretations in reducev and reduceh
+	if( vips_colourspace( in, &t[6], VIPS_INTERPRETATION_RGB16, NULL) )
+		return( -1 );
+	in = t[6];
 
 	/* Any residual downsizing.
 	 */
