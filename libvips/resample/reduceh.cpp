@@ -86,11 +86,6 @@ typedef struct _VipsReduceh {
 
 typedef VipsResampleClass VipsReducehClass;
 
-void
-calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
-                   double *weights, int n );
-
-
 /* We need C linkage for this.
  */
 extern "C" {
@@ -362,11 +357,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	const int num_bands = in->Bands *
 	                      (vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
 
-	int resize_filter_support = 3;
+	const int resize_filter_support = 3;
 	double support = reduceh->hshrink * resize_filter_support;
-
-	typedef unsigned short T;
-	const int max_value = USHRT_MAX;
 
 	double first_bisect = (double) (r->left + 0 + 0.5) *
 		reduceh->hshrink + EPSILON;
@@ -378,13 +370,9 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	VipsRect s = {
 		.left = first_start,
 		.top = r->top,
-		.width = last_stop, //(int)VIPS_MIN((r->width - 1) * reduceh->hshrink + 2 * support, in->Xsize - start),
+		.width = last_stop,
 		.height = r->height,
 	};
-
-	// last_stop - first_start = (double) (r->left + r->width - 1 + 0.5) * reduceh->hshrink + EPSILON + support + 0.5
-	//		                  - ((double) (r->left + 0 + 0.5)            * reduceh->hshrink + EPSILON - support + 0.5)
-	// = (r->width - 1) * reduceh->hshrink + 2 * support
 
 #ifdef DEBUG
 	printf( "vips_reduceh_gen: generating %d x %d at %d x %d\n",
@@ -413,13 +401,15 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		if( n == 0 )
 			continue;
 
-		calculate_weights( reduceh, bisect, start, weights, n );
+		calculate_weights( reduceh->hshrink, bisect, start, weights, n );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
 		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left + x, r->top);
 
-
 		for( int y = 0; y < r->height; y++ ) {
+			typedef unsigned short T;
+			const int max_value = USHRT_MAX;
+
 			for( int band_index = 0; band_index < num_bands; band_index++ ) {
 				T pixel;
 
@@ -445,31 +435,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	VIPS_COUNT_PIXELS( out_region, "vips_reduceh_gen" );
 
 	return (0);
-}
-
-void
-calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
-                   double *weights, int n )
-{
-	const double resize_filter_scale = (1.0 / 3.0);
-	double density = 0;
-
-	for( int i = 0; i < n; i++ ) {
-		double wx = VIPS_ABS(
-			((double) (start + i) - bisect + 0.5) / reduceh->hshrink);
-		weights[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
-		density += weights[i];
-	}
-
-	if( (density != 0.0) && (density != 1.0) ) {
-		/*
-		  Normalize.
-		*/
-		density = 1 / density;
-		for( int i = 0; i < n; i++ ) {
-			weights[i] *= density;
-		}
-	}
 }
 
 static int

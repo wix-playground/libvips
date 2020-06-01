@@ -68,6 +68,7 @@
 
 #include "presample.h"
 #include "templates.h"
+#include "reduce.h"
 
 /* We can't run more than this many passes. Larger than this and we
  * fall back to C.
@@ -510,18 +511,6 @@ reducev_notab( VipsReducev *reducev,
 
 #define EPSILON  (1.0e-12)
 
-static inline double reciprocal(const double x)
-{
-	double sign;
-
-	/*
-	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
-	*/
-	sign=x < 0.0 ? -1.0 : 1.0;
-	if ((sign*x) >= EPSILON)
-		return (1.0/x);
-	return (sign/EPSILON);
-}
 
 static int
 vips_reducev_gen( VipsRegion *out_region, void *seq,
@@ -538,7 +527,6 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	                  (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
 
 	int resize_filter_support = 3;
-	double resize_filter_scale = (1.0/3.0);
 	double support = reducev->vshrink * resize_filter_support;
 
 	typedef unsigned short T;
@@ -573,7 +561,7 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 //			abort();
 	}
 
-	double *weight = (double*)alloca(sizeof(double) * (last_stop - first_start));
+	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
@@ -581,51 +569,34 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 		double bisect = (double) (r->top + y + 0.5) / scale + EPSILON;
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
-		double density = 0;
 		int n = stop - start;
 
 		if( n == 0 )
 			continue;
 
-		for( int i = 0; i < n; i++ ) {
-			double wy = VIPS_ABS(scale * ((double) start + i - bisect + 0.5) );
-			weight[i] = sinc_fast( wy * resize_filter_scale ) * sinc_fast( wy );
-			density += weight[i];
-		}
+		calculate_weights( reducev->vshrink, bisect, start, weights, n );
 
-		if( (density != 0.0) && (density != 1.0) ) {
-			/*
-			  Normalize.
-			*/
-			density = reciprocal( density );
-			for( int i = 0; i < n; i++ ) {
-				weight[i] *= density;
-			}
-		}
+//		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
+//		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left + x, r->top);
+
 
 		for( int x = 0; x < r->width; x++ ) {
-			for( int i = 0; i < bands; i++ ) {
+			for( int band_index = 0; band_index < bands; band_index++ ) {
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
 				                               r->top + y );
 				double pixel = 0;
 
-				if( !vips_image_hasalpha(in) || i == bands - 1 ) {
+				if( !vips_image_hasalpha(in) || band_index == bands - 1 ) {
 					/*
 					  No alpha blending.
 					*/
 					for( int j = 0; j < n; j++ ) {
 						const T* p = (const T*)VIPS_REGION_ADDR( ir,
 							r->left + x, start + j);
-						pixel += weight[j] * p[i];
+						pixel += weights[j] * p[band_index];
 					}
 
-					q[i] = (T) VIPS_CLIP(0, pixel, max_value );
-//					printf( "%f,%f,%f,%f,%d\n",
-//					        weight[0],
-//					        weight[1],
-//					        weight[2],
-//					        weight[3],
-//					        q[i] );
+					q[band_index] = (T) VIPS_CLIP( 0, pixel, max_value );
 					continue;
 				}
 
@@ -637,21 +608,14 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 					const T* p = (const T*)VIPS_REGION_ADDR( ir,
 						r->left + x, start + j);
 					T alpha_value = p[bands - 1];
-					T pixel_value = p[i];
+					T pixel_value = p[band_index];
 
 					double alpha = (1.0 / max_value) * alpha_value;
-					pixel += alpha * weight[j] * pixel_value;
-					gamma += alpha * weight[j];
+					pixel += alpha * weights[j] * pixel_value;
+					gamma += alpha * weights[j];
 				}
 				gamma = reciprocal( gamma );
-				q[i] = VIPS_CLIP( 0, gamma * pixel, max_value );
-
-//				printf( "%f,%f,%f,%f,%d\n",
-//				        weight[0],
-//				        weight[1],
-//				        weight[2],
-//				        weight[3],
-//				        q[i] );
+				q[band_index] = VIPS_CLIP( 0, gamma * pixel, max_value );
 			}
 		}
 	}
@@ -764,8 +728,6 @@ vips_reducev_raw( VipsReducev *reducev, VipsImage *in, VipsImage **out )
 {
 	VipsObjectClass *object_class = VIPS_OBJECT_GET_CLASS( reducev );
 	VipsResample *resample = VIPS_RESAMPLE( reducev );
-
-	VipsGenerateFn generate;
 
 	/* Build masks.
 	 */
