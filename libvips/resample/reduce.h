@@ -47,45 +47,44 @@ calculate_weights( double factor, double bisect, int start,
 	}
 }
 
-template <typename T, int max_value>
-static double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index,
-                                  const double *weights, int n, int band_index,
-                                  const unsigned short *source_bands )
-{
-	double alpha_sum = 0.0;
-	double destination_pixel = 0;
-
-	for( int i = 0; i < n; i++ ) {
-		unsigned short source_alpha = source_bands[alpha_index];
-		unsigned short source_pixel = source_bands[band_index];
-		double alpha = weights[i] * source_alpha / max_value;
-
-		destination_pixel += alpha * source_pixel;
-		alpha_sum += alpha;
-
-		source_bands += stride;
-	}
-
-	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
-}
-
 template <typename T,int max_value>
 static double
 calculate_pixel_no_alpha_blend( int stride,
                                 const double *weights, int n, int band_index,
-                                const unsigned short *source_bands )
+                                const VipsPel* p )
 {
 	double destination_pixel = 0;
 	for( int i = 0; i < n; i++ ) {
-		T source_pixel = source_bands[band_index];
+		T source_pixel = ((T*)p)[band_index];
 		destination_pixel += weights[i] * source_pixel;
 
-		source_bands += stride;
+		p += stride;
 	}
 
 	return VIPS_CLIP( 0, destination_pixel, max_value );
 }
 
+template <typename T, int max_value>
+static double
+calculate_pixel_with_alpha_blend( int stride, int alpha_index,
+                                  const double *weights, int n, int band_index,
+                                  const VipsPel* p )
+{
+	double alpha_sum = 0.0;
+	double destination_pixel = 0;
+
+	for( int i = 0; i < n; i++ ) {
+		T source_alpha = ((T*)p)[alpha_index];
+		T source_pixel = ((T*)p)[band_index];
+		double alpha = weights[i] * source_alpha / max_value;
+
+		destination_pixel += alpha * source_pixel;
+		alpha_sum += alpha;
+
+		p += stride;
+	}
+
+	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
+}
 
 #endif //LIBVIPS_REDUCE_H

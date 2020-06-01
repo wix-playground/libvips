@@ -1,5 +1,6 @@
 # vim: set fileencoding=utf-8 :
 import math
+import os
 
 import pytest
 
@@ -167,6 +168,10 @@ class TestResample:
         # 828 × 322 -> 402 x 156
         self.sharpen(IMAGES + '/olhos-resized-by-magick.png')
 
+    def test_resize_and_sharpen_world_leaders(self):
+        # w_640,h_416
+        self.resize_and_sharpen(IMAGES + '/world-leaders.jpg', 640.0, 416.0)
+
     def test_resize_and_sharpen_olhos(self):
         # 828 × 322 -> 402 x 156
         self.resize_and_sharpen(IMAGES + '/olhos.png', 402.0, 156.0)
@@ -204,6 +209,7 @@ class TestResample:
 
     @staticmethod
     def resize_and_sharpen(filename, new_width, new_height=None):
+        _, ext = os.path.splitext(filename)
         im = pyvips.Image.new_from_file(filename)
         new_height = new_height or im.height * new_width / im.width
         print('new height %s' % new_height)
@@ -214,9 +220,9 @@ class TestResample:
         im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
 
         print('Writing resized')
-        im.write_to_file('%s.resized-lanczos.png' % filename)
+        im.write_to_file('%s.resized-lanczos%s' % (filename, ext))
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
-        im.write_to_file('%s.resized-lanczos-sharpened.png' % filename)
+        im.write_to_file('%s.resized-lanczos-sharpened%s' % (filename, ext))
 
     @staticmethod
     def sharpen(filename):

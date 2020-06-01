@@ -387,6 +387,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
 	const int source_line_skip = VIPS_REGION_LSKIP( ir );
 	const int destination_line_skip = VIPS_REGION_LSKIP( out_region );
+	const int stride = VIPS_IMAGE_SIZEOF_ELEMENT( in ) * num_bands;
 	gboolean has_alpha = vips_image_hasalpha( in );
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
@@ -415,12 +416,10 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 				if( !has_alpha || band_index == alpha_index ) {
 					pixel = calculate_pixel_no_alpha_blend<T, max_value>(
-						num_bands, weights, n, band_index,
-						(T *) p );
+						stride, weights, n, band_index, p );
 				} else {
 					pixel = calculate_pixel_with_alpha_blend<T, max_value>(
-						num_bands, alpha_index, weights, n, band_index,
-						(T *) p );
+						stride, alpha_index, weights, n, band_index, p );
 				}
 				((T *) q)[band_index] = pixel;
 			} // for band_index
