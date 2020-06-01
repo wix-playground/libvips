@@ -404,16 +404,16 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	for( int i = 0; i < outer_dimension_size; i++ ) {
 		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
-		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		int stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
-		int filter_size = stop - start;
+		int filter_start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
+		int filter_stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
+		int filter_size = filter_stop - filter_start;
 
 		if( filter_size == 0 )
 			continue;
 
-		calculate_filter( factor, bisect, start, filter, filter_size );
+		calculate_filter( factor, bisect, filter_start, filter, filter_size );
 
-		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
+		const VipsPel* p = VIPS_REGION_ADDR( ir, filter_start, r->top);
 
 		reduce_inner_dimension<T, max_value>(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
