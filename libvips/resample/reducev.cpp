@@ -511,6 +511,39 @@ reducev_notab( VipsReducev *reducev,
 
 #define EPSILON  (1.0e-12)
 
+template <typename T, int max_value>
+void reduce_inner_dimension( const VipsImage *in,
+                             const double *filter, int filter_size,
+                             const int filter_stride,
+                             int inner_dimension_size, const VipsPel *p,
+                             VipsPel *q )
+{
+	const int source_stride = VIPS_IMAGE_SIZEOF_PEL( in);
+	const int destination_stride = VIPS_IMAGE_SIZEOF_PEL(in);
+	gboolean has_alpha = vips_image_hasalpha( (VipsImage *) in );
+	const int num_bands = in->Bands *
+	                      (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
+	int alpha_index = num_bands - 1;
+
+	for( int i = 0; i < inner_dimension_size; i++ ) {
+		for( int band_index = 0; band_index < num_bands; band_index++ ) {
+			T pixel;
+
+			if( !has_alpha || band_index == alpha_index ) {
+				pixel = apply_filter_no_alpha<T, max_value>(
+					filter_stride, filter, filter_size, band_index, p );
+			} else {
+				pixel = apply_filter_with_alpha<T, max_value>(
+					filter_stride, alpha_index, filter, filter_size, band_index, p );
+			}
+
+			((T *) q)[band_index] = pixel;
+		} // for band_index
+
+		p += source_stride;
+		q += destination_stride;
+	} // for i
+}
 
 static int
 vips_reducev_gen( VipsRegion *out_region, void *seq,
@@ -520,11 +553,6 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	VipsReducev *reducev = (VipsReducev *) void_reducev;
 	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
-
-	/* Double bands for complex.
-	 */
-	const int num_bands = in->Bands *
-	                      (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
 
 	int resize_filter_support = 3;
 	double support = reducev->vshrink * resize_filter_support;
@@ -557,10 +585,7 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
 	const int filter_stride = VIPS_REGION_LSKIP( ir );
-	const int sizeof_pixel = VIPS_IMAGE_SIZEOF_PEL(in);
-	const int source_stride = VIPS_IMAGE_SIZEOF_PEL(in);
-	const int destination_stride = VIPS_IMAGE_SIZEOF_PEL(in);
-	gboolean has_alpha = vips_image_hasalpha( in );
+
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
@@ -569,7 +594,6 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
 		int n = stop - start;
-		int alpha_index = num_bands - 1;
 
 		if( n == 0 )
 			continue;
@@ -580,25 +604,11 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + y);
 
 		int inner_dimension_size = r->width;
+		//move to object: num_bands, has_alpha, alpha_index,
 
-		for( int i = 0; i < inner_dimension_size; i++ ) {
-			for( int band_index = 0; band_index < num_bands; band_index++ ) {
-				T pixel;
+		reduce_inner_dimension<T, max_value>( in, weights, n, filter_stride,
+		                        inner_dimension_size, p, q );
 
-				if( !has_alpha || band_index == alpha_index ) {
-					pixel = apply_filter_no_alpha<T, max_value>(
-						filter_stride, weights, n, band_index, p );
-				} else {
-					pixel = apply_filter_with_alpha<T, max_value>(
-						filter_stride, alpha_index, weights, n, band_index, p );
-				}
-
-				((T*) q)[band_index] = pixel;
-			} // for band_index
-
-			p += source_stride;
-			q += destination_stride;
-		}
 	} // for y
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" );
