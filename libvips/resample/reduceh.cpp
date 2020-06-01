@@ -93,10 +93,16 @@ calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
 
 template <typename T>
 double
-calculate_pixel_no_alpha_blend( int num_bands, int max_value,
+calculate_pixel_no_alpha_blend( int stride, int max_value,
                                 const double *weights, int n,
                                 int band_index,
                                 const unsigned short *source_bands );
+
+template<typename T>
+double
+calculate_pixel_with_alpha_blend( int stride, int alpha_index, int max_value,
+                                  const double *weights, int n, int band_index,
+                                  const unsigned short *source_bands );
 extern "C" {
 G_DEFINE_TYPE( VipsReduceh, vips_reduceh, VIPS_TYPE_RESAMPLE );
 }
@@ -404,7 +410,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	const int source_line_skip = VIPS_REGION_LSKIP( ir );
 	const int destination_line_skip = VIPS_REGION_LSKIP( out_region );
 	gboolean has_alpha = vips_image_hasalpha( in );
-	int alpha_index = num_bands - 1;
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 
@@ -413,6 +418,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5,in->Xsize );
 		int n = stop - start;
+		int alpha_index = num_bands - 1;
 
 		if( n == 0 )
 			continue;
@@ -425,32 +431,18 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 		for( int y = 0; y < r->height; y++ ) {
 			for( int band_index = 0; band_index < num_bands; band_index++ ) {
-				const T* source_bands = (const T*)p;
+				T pixel;
 
 				if( !has_alpha || band_index == alpha_index ) {
-					((T*)q)[band_index] = calculate_pixel_no_alpha_blend<T>(
+					pixel = calculate_pixel_no_alpha_blend<T>(
 						num_bands, max_value, weights, n, band_index,
-						source_bands );
-
-					continue;
+						(T *) p );
+				} else {
+					pixel = calculate_pixel_with_alpha_blend<T>(
+						num_bands, alpha_index, max_value, weights, n, band_index,
+						(T *) p );
 				}
-
-				/*
-		          Alpha blending.
-		        */
-				double alpha_sum = 0.0;
-				double destination_pixel = 0;
-				for( int j = 0; j < n; j++ ) {
-					T source_alpha = source_bands[alpha_index];
-					T source_pixel = source_bands[band_index];
-					double alpha = weights[j] * source_alpha / max_value;
-
-					destination_pixel += alpha * source_pixel;
-					alpha_sum += alpha;
-
-					source_bands += num_bands;
-				}
-				((T*)q)[band_index] = VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
+				((T *) q)[band_index] = pixel;
 			} // for i
 
 			p += source_line_skip;
@@ -465,9 +457,32 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	return (0);
 }
 
+template<typename T>
+double
+calculate_pixel_with_alpha_blend( int stride, int alpha_index, int max_value,
+                                  const double *weights, int n, int band_index,
+                                  const unsigned short *source_bands )
+{
+	double alpha_sum = 0.0;
+	double destination_pixel = 0;
+
+	for( int i = 0; i < n; i++ ) {
+		unsigned short source_alpha = source_bands[alpha_index];
+		unsigned short source_pixel = source_bands[band_index];
+		double alpha = weights[i] * source_alpha / max_value;
+
+		destination_pixel += alpha * source_pixel;
+		alpha_sum += alpha;
+
+		source_bands += stride;
+	}
+
+	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
+}
+
 template <typename T>
 double
-calculate_pixel_no_alpha_blend( int num_bands, int max_value,
+calculate_pixel_no_alpha_blend( int stride, int max_value,
                                 const double *weights, int n,
                                 int band_index,
                                 const unsigned short *source_bands )
@@ -477,7 +492,7 @@ calculate_pixel_no_alpha_blend( int num_bands, int max_value,
 		T source_pixel = source_bands[band_index];
 		destination_pixel += weights[i] * source_pixel;
 
-		source_bands += num_bands;
+		source_bands += stride;
 	}
 
 	return VIPS_CLIP( 0, destination_pixel, max_value );
