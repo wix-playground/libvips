@@ -91,16 +91,16 @@ void
 calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
                    double *weights, int n );
 
-template <typename T>
+template <typename T, int max_value>
 double
-calculate_pixel_no_alpha_blend( int stride, int max_value,
+calculate_pixel_no_alpha_blend( int stride,
                                 const double *weights, int n,
                                 int band_index,
                                 const unsigned short *source_bands );
 
-template<typename T>
+template<typename T, int max_value>
 double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index, int max_value,
+calculate_pixel_with_alpha_blend( int stride, int alpha_index,
                                   const double *weights, int n, int band_index,
                                   const unsigned short *source_bands );
 extern "C" {
@@ -434,12 +434,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 				T pixel;
 
 				if( !has_alpha || band_index == alpha_index ) {
-					pixel = calculate_pixel_no_alpha_blend<T>(
-						num_bands, max_value, weights, n, band_index,
+					pixel = calculate_pixel_no_alpha_blend<T, max_value>(
+						num_bands, weights, n, band_index,
 						(T *) p );
 				} else {
-					pixel = calculate_pixel_with_alpha_blend<T>(
-						num_bands, alpha_index, max_value, weights, n, band_index,
+					pixel = calculate_pixel_with_alpha_blend<T, max_value>(
+						num_bands, alpha_index, weights, n, band_index,
 						(T *) p );
 				}
 				((T *) q)[band_index] = pixel;
@@ -457,9 +457,9 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	return (0);
 }
 
-template<typename T>
+template<typename T, int max_value>
 double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index, int max_value,
+calculate_pixel_with_alpha_blend( int stride, int alpha_index,
                                   const double *weights, int n, int band_index,
                                   const unsigned short *source_bands )
 {
@@ -480,9 +480,9 @@ calculate_pixel_with_alpha_blend( int stride, int alpha_index, int max_value,
 	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
 }
 
-template <typename T>
+template <typename T, int max_value>
 double
-calculate_pixel_no_alpha_blend( int stride, int max_value,
+calculate_pixel_no_alpha_blend( int stride,
                                 const double *weights, int n,
                                 int band_index,
                                 const unsigned short *source_bands )
