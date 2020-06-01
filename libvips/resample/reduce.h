@@ -6,7 +6,7 @@
 #define LIBVIPS_REDUCE_H
 
 static inline void
-calculate_filter( double factor, double bisect, int start,
+calculate_filter( double factor, double bisect, int filter_start,
                   double *weights, int n )
 {
 	const double resize_filter_scale = (1.0 / 3.0);
@@ -14,7 +14,7 @@ calculate_filter( double factor, double bisect, int start,
 
 	for( int i = 0; i < n; i++ ) {
 		double wx = VIPS_ABS(
-			((double) (start + i) - bisect + 0.5) / factor );
+			((double) (filter_start + i) - bisect + 0.5) / factor );
 		weights[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
 		density += weights[i];
 	}
@@ -75,8 +75,8 @@ template <typename T, int max_value>
 static void reduce_inner_dimension( const VipsImage *in, const double *filter,
                                     int filter_size, const int filter_stride,
                                     int inner_dimension_size, const VipsPel *p,
-                                    VipsPel *q, int source_stride,
-                                    int destination_stride )
+                                    VipsPel *q, int source_inner_stride,
+                                    int destination_inner_stride )
 {
 	gboolean has_alpha = vips_image_hasalpha( (VipsImage *) in );
 	const int num_bands = in->Bands *
@@ -98,8 +98,8 @@ static void reduce_inner_dimension( const VipsImage *in, const double *filter,
 			((T *) q)[band_index] = pixel;
 		} // for band_index
 
-		p += source_stride;
-		q += destination_stride;
+		p += source_inner_stride;
+		q += destination_inner_stride;
 	} // for i
 }
 

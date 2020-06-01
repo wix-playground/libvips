@@ -550,8 +550,8 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 	double *filter = (double*)alloca( sizeof(double) * (last_stop - first_start));
 	const int filter_stride = VIPS_REGION_LSKIP( ir );
-	int source_stride = VIPS_IMAGE_SIZEOF_PEL( in );
-	int destination_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
+	int source_inner_stride = VIPS_IMAGE_SIZEOF_PEL( in );
+	int destination_inner_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
@@ -560,25 +560,28 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	int destination_start = r->top;
 	double factor = reducev->vshrink;
 	int inner_dimension_size = r->width;
+	int destination_outer_stride = VIPS_REGION_LSKIP( out_region );
+
+	VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top);
 
 	for( int i = 0; i < outer_dimension_size; i ++ ) {
 		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
-		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		int stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
-		int filter_size = stop - start;
+		int filter_start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
+		int filter_stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
+		int filter_size = filter_stop - filter_start;
 
 		if( filter_size == 0 )
 			continue;
 
-		calculate_filter( factor, bisect, start, filter, filter_size );
+		calculate_filter( factor, bisect, filter_start, filter, filter_size );
 
-		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, start);
-		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + i);
+		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, filter_start);
 
 		reduce_inner_dimension<T, max_value>(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
-			source_stride, destination_stride );
+			source_inner_stride, destination_inner_stride );
 
+		q += destination_outer_stride;
 	}
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" );

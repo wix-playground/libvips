@@ -388,8 +388,9 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	double *filter = (double*)alloca( sizeof(double) * (last_stop - first_start));
 	const int filter_stride = VIPS_IMAGE_SIZEOF_ELEMENT( in ) * num_bands;
-	int source_stride = VIPS_REGION_LSKIP( ir );
-	int destination_stride = VIPS_REGION_LSKIP( out_region );
+	int source_inner_stride = VIPS_REGION_LSKIP( ir );
+	int destination_inner_stride = VIPS_REGION_LSKIP( out_region );
+	int destination_outer_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 
@@ -398,6 +399,8 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	int destination_start = r->left;
 	double factor = reduceh->hshrink;
 	int inner_dimension_size = r->height;
+
+	VipsPel* q = VIPS_REGION_ADDR( out_region, r->left, r->top);
 
 	for( int i = 0; i < outer_dimension_size; i++ ) {
 		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
@@ -411,12 +414,12 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		calculate_filter( factor, bisect, start, filter, filter_size );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
-		VipsPel* q = VIPS_REGION_ADDR( out_region, r->left + i, r->top);
 
 		reduce_inner_dimension<T, max_value>(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
-			source_stride, destination_stride );
+			source_inner_stride, destination_inner_stride );
 
+		q += destination_outer_stride;
 	}
 
 	VIPS_GATE_STOP( "vips_reduceh_gen: work" );
