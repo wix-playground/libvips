@@ -585,13 +585,6 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 		for( int x = 0; x < r->width; x++ ) {
 			for( int band_index = 0; band_index < num_bands; band_index++ ) {
-				const VipsPel *p = VIPS_REGION_ADDR( ir,
-				                                     r->left + x,
-				                                     start );
-
-				VipsPel *q = VIPS_REGION_ADDR( out_region,
-				                               r->left + x,
-				                               r->top + y );
 				T pixel = 0;
 
 				if( !has_alpha || band_index == alpha_index ) {
