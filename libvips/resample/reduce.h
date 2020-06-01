@@ -47,11 +47,7 @@ calculate_weights( double factor, double bisect, int start,
 	}
 }
 
-template <
-typename T,
-int max_value
->
-
+template <typename T, int max_value>
 static double
 calculate_pixel_with_alpha_blend( int stride, int alpha_index,
                                   const double *weights, int n, int band_index,
@@ -74,15 +70,10 @@ calculate_pixel_with_alpha_blend( int stride, int alpha_index,
 	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
 }
 
-template <
-typename T,
-int max_value
->
-
-double
+template <typename T,int max_value>
+static double
 calculate_pixel_no_alpha_blend( int stride,
-                                const double *weights, int n,
-                                int band_index,
+                                const double *weights, int n, int band_index,
                                 const unsigned short *source_bands )
 {
 	double destination_pixel = 0;

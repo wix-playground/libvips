@@ -523,8 +523,8 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 	/* Double bands for complex.
 	 */
-	const int bands = in->Bands *
-	                  (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
+	const int num_bands = in->Bands *
+	                      (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
 
 	int resize_filter_support = 3;
 	double support = reducev->vshrink * resize_filter_support;
@@ -562,6 +562,10 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	}
 
 	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
+	const int source_line_skip = VIPS_REGION_LSKIP( ir );
+	const int destination_line_skip = VIPS_REGION_LSKIP( out_region );
+	const int sizeof_pixel = VIPS_IMAGE_SIZEOF_PEL(in);
+	gboolean has_alpha = vips_image_hasalpha( in );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
@@ -570,23 +574,24 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
 		int n = stop - start;
+		int alpha_index = num_bands - 1;
 
 		if( n == 0 )
 			continue;
 
 		calculate_weights( reducev->vshrink, bisect, start, weights, n );
 
-//		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
-//		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left + x, r->top);
-
+		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, start);
+		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + y);
 
 		for( int x = 0; x < r->width; x++ ) {
-			for( int band_index = 0; band_index < bands; band_index++ ) {
+			for( int band_index = 0; band_index < num_bands; band_index++ ) {
 				T *q = (T *) VIPS_REGION_ADDR( out_region, r->left + x,
 				                               r->top + y );
 				double pixel = 0;
+//				T pixel = 0;
 
-				if( !vips_image_hasalpha(in) || band_index == bands - 1 ) {
+				if( !has_alpha || band_index == alpha_index ) {
 					/*
 					  No alpha blending.
 					*/
@@ -597,28 +602,41 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 					}
 
 					q[band_index] = (T) VIPS_CLIP( 0, pixel, max_value );
-					continue;
-				}
+//					pixel = calculate_pixel_no_alpha_blend<T, max_value>(
+//						source_line_skip / sizeof_pixel, weights,
+//						n, band_index,
+//						(T *) p );
+				} else {
+//					pixel = calculate_pixel_with_alpha_blend<T, max_value>(
+//						source_line_skip / sizeof_pixel, alpha_index, weights, n, band_index,
+//						(T *) p );
 
-				/*
-		          Alpha blending.
-		        */
-				double gamma = 0.0;
-				for( int j = 0; j < n; j++ ) {
-					const T* p = (const T*)VIPS_REGION_ADDR( ir,
-						r->left + x, start + j);
-					T alpha_value = p[bands - 1];
-					T pixel_value = p[band_index];
+					/*
+					  Alpha blending.
+					*/
+					double gamma = 0.0;
+					for( int j = 0; j < n; j++ ) {
+						const T *p = (const T *) VIPS_REGION_ADDR( ir,
+						                                           r->left + x,
+						                                           start + j );
+						T alpha_value = p[num_bands - 1];
+						T pixel_value = p[band_index];
 
-					double alpha = (1.0 / max_value) * alpha_value;
-					pixel += alpha * weights[j] * pixel_value;
-					gamma += alpha * weights[j];
+						double alpha = (1.0 / max_value) * alpha_value;
+						pixel += alpha * weights[j] * pixel_value;
+						gamma += alpha * weights[j];
+					}
+					gamma = reciprocal( gamma );
+					q[band_index] = VIPS_CLIP( 0, gamma * pixel, max_value );
 				}
-				gamma = reciprocal( gamma );
-				q[band_index] = VIPS_CLIP( 0, gamma * pixel, max_value );
-			}
-		}
-	}
+//				((T *) q)[band_index] = pixel;
+
+			} // for band_index
+
+			p += sizeof_pixel;
+			q += sizeof_pixel;
+		} // for x
+	} // for y
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" );
 

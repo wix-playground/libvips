@@ -423,7 +423,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 						(T *) p );
 				}
 				((T *) q)[band_index] = pixel;
-			} // for i
+			} // for band_index
 
 			p += source_line_skip;
 			q += destination_line_skip;
