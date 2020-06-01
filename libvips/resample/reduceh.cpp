@@ -360,6 +360,9 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	const int resize_filter_support = 3;
 	double support = reduceh->hshrink * resize_filter_support;
 
+	typedef unsigned short T;
+	const int max_value = USHRT_MAX;
+
 	double first_bisect = (double) (r->left + 0 + 0.5) *
 		reduceh->hshrink + EPSILON;
 	int first_start = (int) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
@@ -385,9 +388,9 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		return (-1);
 
 	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
-	const int source_line_skip = VIPS_REGION_LSKIP( ir );
-	const int destination_line_skip = VIPS_REGION_LSKIP( out_region );
-	const int stride = VIPS_IMAGE_SIZEOF_ELEMENT( in ) * num_bands;
+	const int source_stride = VIPS_REGION_LSKIP( ir );
+	const int destination_stride = VIPS_REGION_LSKIP( out_region );
+	const int filter_stride = VIPS_IMAGE_SIZEOF_ELEMENT( in ) * num_bands;
 	gboolean has_alpha = vips_image_hasalpha( in );
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
@@ -407,25 +410,24 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
 		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left + x, r->top);
 
-		for( int y = 0; y < r->height; y++ ) {
-			typedef unsigned short T;
-			const int max_value = USHRT_MAX;
+		int inner_dimension_size = r->height;
 
+		for( int i = 0; i < inner_dimension_size; i++ ) {
 			for( int band_index = 0; band_index < num_bands; band_index++ ) {
 				T pixel;
 
 				if( !has_alpha || band_index == alpha_index ) {
-					pixel = calculate_pixel_no_alpha_blend<T, max_value>(
-						stride, weights, n, band_index, p );
+					pixel = apply_filter_no_alpha<T, max_value>(
+						filter_stride, weights, n, band_index, p );
 				} else {
-					pixel = calculate_pixel_with_alpha_blend<T, max_value>(
-						stride, alpha_index, weights, n, band_index, p );
+					pixel = apply_filter_with_alpha<T, max_value>(
+						filter_stride, alpha_index, weights, n, band_index, p );
 				}
 				((T *) q)[band_index] = pixel;
 			} // for band_index
 
-			p += source_line_skip;
-			q += destination_line_skip;
+			p += source_stride;
+			q += destination_stride;
 		} // for y
 	} // for x
 

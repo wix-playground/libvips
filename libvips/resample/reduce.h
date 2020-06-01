@@ -49,9 +49,9 @@ calculate_weights( double factor, double bisect, int start,
 
 template <typename T,int max_value>
 static double
-calculate_pixel_no_alpha_blend( int stride,
-                                const double *weights, int n, int band_index,
-                                const VipsPel* p )
+apply_filter_no_alpha( int stride,
+                       const double *weights, int n, int band_index,
+                       const VipsPel* p )
 {
 	double destination_pixel = 0;
 	for( int i = 0; i < n; i++ ) {
@@ -66,9 +66,9 @@ calculate_pixel_no_alpha_blend( int stride,
 
 template <typename T, int max_value>
 static double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index,
-                                  const double *weights, int n, int band_index,
-                                  const VipsPel* p )
+apply_filter_with_alpha( int stride, int alpha_index,
+                         const double *weights, int n, int band_index,
+                         const VipsPel* p )
 {
 	double alpha_sum = 0.0;
 	double destination_pixel = 0;
