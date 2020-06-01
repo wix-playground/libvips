@@ -5,33 +5,16 @@
 #ifndef LIBVIPS_REDUCE_H
 #define LIBVIPS_REDUCE_H
 
-#define EPSILON  (1.0e-12)
-
-static inline double reciprocal( const double x )
-{
-	double sign;
-
-	/*
-	  Return 1/x where x is perceptible (not unlimited or infinitesimal).
-	*/
-	sign = x < 0.0 ? -1.0 : 1.0;
-	if( sign * x >= EPSILON )
-		return( 1.0 / x );
-
-	return( sign / EPSILON );
-}
-
 static inline void
 calculate_filter( double factor, double bisect, int start,
                   double *weights, int n )
 {
 	const double resize_filter_scale = (1.0 / 3.0);
 	double density = 0;
-	factor = reciprocal( factor );
 
 	for( int i = 0; i < n; i++ ) {
 		double wx = VIPS_ABS(
-			((double) (start + i) - bisect + 0.5) * factor );
+			((double) (start + i) - bisect + 0.5) / factor );
 		weights[i] = sinc_fast( wx * resize_filter_scale ) * sinc_fast( wx );
 		density += weights[i];
 	}

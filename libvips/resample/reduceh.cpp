@@ -362,7 +362,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	typedef unsigned short T;
 	const int max_value = USHRT_MAX;
-	double scale = reciprocal(reduceh->hshrink);
 	double first_bisect = (double) (r->left + 0 + 0.5) *
 		reduceh->hshrink + EPSILON;
 	int first_start = (int) VIPS_MAX( first_bisect - support + 0.5, 0.0 );
@@ -394,23 +393,28 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 	VIPS_GATE_START( "vips_reduceh_gen: work" );
 
+	int max_source_size = in->Xsize;
 	int outer_dimension_size = r->width;
+	int destination_start = r->left;
+	double factor = reduceh->hshrink;
+	int inner_dimension_size = r->height;
+
 	for( int i = 0; i < outer_dimension_size; i++ ) {
-		double bisect = (double) (r->left + i + 0.5) / scale + EPSILON;
+		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		int stop = (int) VIPS_MIN( bisect + support + 0.5,in->Xsize );
+		int stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
 		int filter_size = stop - start;
 
 		if( filter_size == 0 )
 			continue;
 
-		calculate_filter( reduceh->hshrink, bisect, start, filter, filter_size );
+		calculate_filter( factor, bisect, start, filter, filter_size );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, start, r->top);
 		VipsPel* q = VIPS_REGION_ADDR( out_region, r->left + i, r->top);
 
 		reduce_inner_dimension<T, max_value>(
-			in, filter, filter_size, filter_stride, r->height, p, q,
+			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
 			source_stride, destination_stride );
 
 	}

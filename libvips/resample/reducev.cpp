@@ -525,12 +525,11 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 	typedef unsigned short T;
 	const int max_value = USHRT_MAX;
-	double scale = reciprocal(reducev->vshrink);
 
-	double first_bisect = (double)(r->top + 0 + 0.5) / scale + EPSILON;
+	double first_bisect = (double)(r->top + 0 + 0.5) * reducev->vshrink + EPSILON;
 	int first_start = VIPS_MAX( first_bisect - support + 0.5, 0.0 );
 
-	double last_bisect = (double)(r->top + r->height - 1 + 0.5) / scale + EPSILON;
+	double last_bisect = (double)(r->top + r->height - 1 + 0.5) * reducev->vshrink + EPSILON;
 	int last_stop = VIPS_MIN( last_bisect + support + 0.5, in->Ysize);
 	VipsRect s = {
 		.left = r->left,
@@ -557,22 +556,27 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
 	int outer_dimension_size = r->height;
+	int max_source_size = in->Ysize;
+	int destination_start = r->top;
+	double factor = reducev->vshrink;
+	int inner_dimension_size = r->width;
+
 	for( int i = 0; i < outer_dimension_size; i ++ ) {
-		double bisect = (double) (r->top + i + 0.5) / scale + EPSILON;
+		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
+		int stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
 		int filter_size = stop - start;
 
 		if( filter_size == 0 )
 			continue;
 
-		calculate_filter( reducev->vshrink, bisect, start, filter, filter_size );
+		calculate_filter( factor, bisect, start, filter, filter_size );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, start);
 		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + i);
 
 		reduce_inner_dimension<T, max_value>(
-			in, filter, filter_size, filter_stride, r->width, p, q,
+			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
 			source_stride, destination_stride );
 
 	}
