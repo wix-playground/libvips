@@ -56,6 +56,7 @@
 
 #include "presample.h"
 #include "templates.h"
+#include "reduce.h"
 
 typedef struct _VipsReduceh {
 	VipsResample parent_instance;
@@ -85,24 +86,13 @@ typedef struct _VipsReduceh {
 
 typedef VipsResampleClass VipsReducehClass;
 
-/* We need C linkage for this.
- */
 void
 calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
                    double *weights, int n );
 
-template <typename T, int max_value>
-double
-calculate_pixel_no_alpha_blend( int stride,
-                                const double *weights, int n,
-                                int band_index,
-                                const unsigned short *source_bands );
 
-template<typename T, int max_value>
-double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index,
-                                  const double *weights, int n, int band_index,
-                                  const unsigned short *source_bands );
+/* We need C linkage for this.
+ */
 extern "C" {
 G_DEFINE_TYPE( VipsReduceh, vips_reduceh, VIPS_TYPE_RESAMPLE );
 }
@@ -455,47 +445,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	VIPS_COUNT_PIXELS( out_region, "vips_reduceh_gen" );
 
 	return (0);
-}
-
-template<typename T, int max_value>
-double
-calculate_pixel_with_alpha_blend( int stride, int alpha_index,
-                                  const double *weights, int n, int band_index,
-                                  const unsigned short *source_bands )
-{
-	double alpha_sum = 0.0;
-	double destination_pixel = 0;
-
-	for( int i = 0; i < n; i++ ) {
-		unsigned short source_alpha = source_bands[alpha_index];
-		unsigned short source_pixel = source_bands[band_index];
-		double alpha = weights[i] * source_alpha / max_value;
-
-		destination_pixel += alpha * source_pixel;
-		alpha_sum += alpha;
-
-		source_bands += stride;
-	}
-
-	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
-}
-
-template <typename T, int max_value>
-double
-calculate_pixel_no_alpha_blend( int stride,
-                                const double *weights, int n,
-                                int band_index,
-                                const unsigned short *source_bands )
-{
-	double destination_pixel = 0;
-	for( int i = 0; i < n; i++ ) {
-		T source_pixel = source_bands[band_index];
-		destination_pixel += weights[i] * source_pixel;
-
-		source_bands += stride;
-	}
-
-	return VIPS_CLIP( 0, destination_pixel, max_value );
 }
 
 void
