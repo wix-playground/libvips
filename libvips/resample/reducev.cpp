@@ -511,40 +511,6 @@ reducev_notab( VipsReducev *reducev,
 
 #define EPSILON  (1.0e-12)
 
-template <typename T, int max_value>
-void reduce_inner_dimension( const VipsImage *in,
-                             const double *filter, int filter_size,
-                             const int filter_stride,
-                             int inner_dimension_size, const VipsPel *p,
-                             VipsPel *q )
-{
-	const int source_stride = VIPS_IMAGE_SIZEOF_PEL( in);
-	const int destination_stride = VIPS_IMAGE_SIZEOF_PEL(in);
-	gboolean has_alpha = vips_image_hasalpha( (VipsImage *) in );
-	const int num_bands = in->Bands *
-	                      (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
-	int alpha_index = num_bands - 1;
-
-	for( int i = 0; i < inner_dimension_size; i++ ) {
-		for( int band_index = 0; band_index < num_bands; band_index++ ) {
-			T pixel;
-
-			if( !has_alpha || band_index == alpha_index ) {
-				pixel = apply_filter_no_alpha<T, max_value>(
-					filter_stride, filter, filter_size, band_index, p );
-			} else {
-				pixel = apply_filter_with_alpha<T, max_value>(
-					filter_stride, alpha_index, filter, filter_size, band_index, p );
-			}
-
-			((T *) q)[band_index] = pixel;
-		} // for band_index
-
-		p += source_stride;
-		q += destination_stride;
-	} // for i
-}
-
 static int
 vips_reducev_gen( VipsRegion *out_region, void *seq,
                   void *void_in, void *void_reducev, gboolean *stop )
@@ -583,33 +549,33 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
-	double *weights = (double*)alloca( sizeof(double) * (last_stop - first_start));
+	double *filter = (double*)alloca( sizeof(double) * (last_stop - first_start));
 	const int filter_stride = VIPS_REGION_LSKIP( ir );
-
+	int source_stride = VIPS_IMAGE_SIZEOF_PEL( in );
+	int destination_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
 
 	VIPS_GATE_START( "vips_reducev_gen: work" );
 
-	for( int y = 0; y < r->height; y ++ ) {
-		double bisect = (double) (r->top + y + 0.5) / scale + EPSILON;
+	int outer_dimension_size = r->height;
+	for( int i = 0; i < outer_dimension_size; i ++ ) {
+		double bisect = (double) (r->top + i + 0.5) / scale + EPSILON;
 		int start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
 		int stop = (int) VIPS_MIN( bisect + support + 0.5, in->Ysize);
-		int n = stop - start;
+		int filter_size = stop - start;
 
-		if( n == 0 )
+		if( filter_size == 0 )
 			continue;
 
-		calculate_weights( reducev->vshrink, bisect, start, weights, n );
+		calculate_filter( reducev->vshrink, bisect, start, filter, filter_size );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, start);
-		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + y);
+		VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top + i);
 
-		int inner_dimension_size = r->width;
-		//move to object: num_bands, has_alpha, alpha_index,
+		reduce_inner_dimension<T, max_value>(
+			in, filter, filter_size, filter_stride, r->width, p, q,
+			source_stride, destination_stride );
 
-		reduce_inner_dimension<T, max_value>( in, weights, n, filter_stride,
-		                        inner_dimension_size, p, q );
-
-	} // for y
+	}
 
 	VIPS_GATE_STOP( "vips_reducev_gen: work" );
 

@@ -22,8 +22,8 @@ static inline double reciprocal( const double x )
 }
 
 static inline void
-calculate_weights( double factor, double bisect, int start,
-                   double *weights, int n )
+calculate_filter( double factor, double bisect, int start,
+                  double *weights, int n )
 {
 	const double resize_filter_scale = (1.0 / 3.0);
 	double density = 0;
@@ -86,5 +86,39 @@ apply_filter_with_alpha( int stride, int alpha_index,
 
 	return VIPS_CLIP( 0, destination_pixel / alpha_sum, max_value );
 }
+
+
+template <typename T, int max_value>
+static void reduce_inner_dimension( const VipsImage *in, const double *filter,
+                                    int filter_size, const int filter_stride,
+                                    int inner_dimension_size, const VipsPel *p,
+                                    VipsPel *q, int source_stride,
+                                    int destination_stride )
+{
+	gboolean has_alpha = vips_image_hasalpha( (VipsImage *) in );
+	const int num_bands = in->Bands *
+	                      (vips_band_format_iscomplex( in->BandFmt ) ?  2 : 1);
+	int alpha_index = num_bands - 1;
+
+	for( int i = 0; i < inner_dimension_size; i++ ) {
+		for( int band_index = 0; band_index < num_bands; band_index++ ) {
+			T pixel;
+
+			if( !has_alpha || band_index == alpha_index ) {
+				pixel = apply_filter_no_alpha<T, max_value>(
+					filter_stride, filter, filter_size, band_index, p );
+			} else {
+				pixel = apply_filter_with_alpha<T, max_value>(
+					filter_stride, alpha_index, filter, filter_size, band_index, p );
+			}
+
+			((T *) q)[band_index] = pixel;
+		} // for band_index
+
+		p += source_stride;
+		q += destination_stride;
+	} // for i
+}
+
 
 #endif //LIBVIPS_REDUCE_H
