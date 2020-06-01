@@ -91,6 +91,12 @@ void
 calculate_weights( const VipsReduceh *reduceh, double bisect, int start,
                    double *weights, int n );
 
+template <typename T>
+double
+calculate_pixel_no_alpha_blend( int num_bands, int max_value,
+                                const double *weights, int n,
+                                int band_index,
+                                const unsigned short *source_bands );
 extern "C" {
 G_DEFINE_TYPE( VipsReduceh, vips_reduceh, VIPS_TYPE_RESAMPLE );
 }
@@ -420,20 +426,11 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		for( int y = 0; y < r->height; y++ ) {
 			for( int band_index = 0; band_index < num_bands; band_index++ ) {
 				const T* source_bands = (const T*)p;
-				double destination_pixel = 0;
 
 				if( !has_alpha || band_index == alpha_index ) {
-					/*
-					  No alpha blending.
-					*/
-					for( int i = 0; i < n; i++ ) {
-						T source_pixel = source_bands[band_index];
-						destination_pixel += weights[i] * source_pixel;
-
-						source_bands += num_bands;
-					}
-
-					((T*)q)[band_index] = (T) VIPS_CLIP( 0, destination_pixel, max_value );
+					((T*)q)[band_index] = calculate_pixel_no_alpha_blend<T>(
+						num_bands, max_value, weights, n, band_index,
+						source_bands );
 
 					continue;
 				}
@@ -442,6 +439,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 		          Alpha blending.
 		        */
 				double alpha_sum = 0.0;
+				double destination_pixel = 0;
 				for( int j = 0; j < n; j++ ) {
 					T source_alpha = source_bands[alpha_index];
 					T source_pixel = source_bands[band_index];
@@ -465,6 +463,24 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	VIPS_COUNT_PIXELS( out_region, "vips_reduceh_gen" );
 
 	return (0);
+}
+
+template <typename T>
+double
+calculate_pixel_no_alpha_blend( int num_bands, int max_value,
+                                const double *weights, int n,
+                                int band_index,
+                                const unsigned short *source_bands )
+{
+	double destination_pixel = 0;
+	for( int i = 0; i < n; i++ ) {
+		T source_pixel = source_bands[band_index];
+		destination_pixel += weights[i] * source_pixel;
+
+		source_bands += num_bands;
+	}
+
+	return VIPS_CLIP( 0, destination_pixel, max_value );
 }
 
 void
