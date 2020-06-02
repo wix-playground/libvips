@@ -571,7 +571,7 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, filter_start);
 
-		reduce_inner_dimension<unsigned short, true, 0, USHRT_MAX>(
+		reduce_inner_dimension_band_fmt(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
 			source_inner_stride, destination_inner_stride );
 
