@@ -523,19 +523,17 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	int resize_filter_support = 3;
 	double support = reducev->vshrink * resize_filter_support;
 
-	typedef unsigned short T;
-	const int max_value = USHRT_MAX;
-
 	double first_bisect = (double)(r->top + 0 + 0.5) * reducev->vshrink + EPSILON;
 	int first_start = VIPS_MAX( first_bisect - support + 0.5, 0.0 );
 
 	double last_bisect = (double)(r->top + r->height - 1 + 0.5) * reducev->vshrink + EPSILON;
 	int last_stop = VIPS_MIN( last_bisect + support + 0.5, in->Ysize);
+	int filter_max_size = last_stop - first_start;
 	VipsRect s = {
 		.left = r->left,
 		.top = first_start,
 		.width = r->width,
-		.height = last_stop - first_start,
+		.height = filter_max_size,
 	};
 
 #ifdef DEBUG
@@ -548,7 +546,7 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
 
-	double *filter = (double*)alloca( sizeof(double) * (last_stop - first_start));
+	double *filter = (double*)alloca( sizeof(double) * filter_max_size );
 	const int filter_stride = VIPS_REGION_LSKIP( ir );
 	int source_inner_stride = VIPS_IMAGE_SIZEOF_PEL( in );
 	int destination_inner_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
@@ -565,19 +563,16 @@ vips_reducev_gen( VipsRegion *out_region, void *seq,
 	VipsPel* q = VIPS_REGION_ADDR(out_region, r->left, r->top);
 
 	for( int i = 0; i < outer_dimension_size; i ++ ) {
-		double bisect = (double) (destination_start + i + 0.5) * factor + EPSILON;
-		int filter_start = (int) VIPS_MAX( bisect - support + 0.5, 0.0 );
-		int filter_stop = (int) VIPS_MIN( bisect + support + 0.5, max_source_size );
-		int filter_size = filter_stop - filter_start;
+		int filter_size;
+		int filter_start;
 
-		if( filter_size == 0 )
-			continue;
-
-		calculate_filter( factor, bisect, filter_start, filter, filter_size );
+		calculate_filter(
+			factor, destination_start + i, max_source_size, filter,
+			&filter_size, &filter_start );
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, r->left, filter_start);
 
-		reduce_inner_dimension<T, max_value>(
+		reduce_inner_dimension<unsigned short, USHRT_MAX>(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
 			source_inner_stride, destination_inner_stride );
 
