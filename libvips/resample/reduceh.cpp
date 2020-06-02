@@ -357,9 +357,6 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 	const int num_bands = in->Bands *
 	                      (vips_band_format_iscomplex( in->BandFmt ) ? 2 : 1);
 
-	typedef unsigned short T;
-	const int max_value = USHRT_MAX;
-
 	const int filter_support = 3;
 	double support = reduceh->hshrink * filter_support;
 
@@ -415,7 +412,7 @@ vips_reduceh_gen( VipsRegion *out_region, void *seq,
 
 		const VipsPel* p = VIPS_REGION_ADDR( ir, filter_start, r->top);
 
-		reduce_inner_dimension<T, true, 0, max_value>(
+		reduce_inner_dimension_band_fmt(
 			in, filter, filter_size, filter_stride, inner_dimension_size, p, q,
 			source_inner_stride, destination_inner_stride );
 
