@@ -6,13 +6,16 @@ libresample_la_SOURCES = \
 	resample.c \
 	similarity.c \
 	resize.c \
+	alpha_resize.c \
 	presample.h \
 	shrink.c \
 	shrinkh.c \
 	shrinkv.c \
 	reduce.c \
 	reduceh.cpp \
+	alpha_reduceh.cpp \
 	reducev.cpp \
+	alpha_reducev.cpp \
 	interpolate.c \
 	transform.c \
 	bicubic.cpp \

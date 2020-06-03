@@ -187,5 +187,6 @@ vips_resample_operation_init( void )
 	vips_similarity_get_type(); 
 	vips_rotate_get_type(); 
 	vips_resize_get_type(); 
+	vips_alpha_resize_get_type();
 }
 

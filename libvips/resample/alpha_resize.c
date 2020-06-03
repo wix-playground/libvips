@@ -85,7 +85,7 @@
 
 #include "presample.h"
 
-typedef struct _VipsResize {
+typedef struct _VipsAlphaResize {
 	VipsResample parent_instance;
 
 	double scale;
@@ -99,11 +99,11 @@ typedef struct _VipsResize {
 	double idy;
 	gboolean centre;
 
-} VipsResize;
+} VipsAlphaResize;
 
-typedef VipsResampleClass VipsResizeClass;
+typedef VipsResampleClass VipsAlphaResizeClass;
 
-G_DEFINE_TYPE( VipsResize, vips_resize, VIPS_TYPE_RESAMPLE ); 
+G_DEFINE_TYPE( VipsAlphaResize, vips_alpha_resize, VIPS_TYPE_RESAMPLE );
 
 /* How much of a scale should be by an integer shrink factor?
  *
@@ -119,7 +119,7 @@ G_DEFINE_TYPE( VipsResize, vips_resize, VIPS_TYPE_RESAMPLE );
  * stored in there. 
  */
 static int
-vips_resize_int_shrink( VipsResize *resize, double scale )
+vips_alpha_resize_int_shrink( VipsAlphaResize *resize, double scale )
 {
 	int shrink;
 
@@ -148,7 +148,7 @@ vips_resize_int_shrink( VipsResize *resize, double scale )
  * this to pick a thing for affine().
  */
 static const char *
-vips_resize_interpolate( VipsKernel kernel )
+vips_alpha_resize_interpolate( VipsKernel kernel )
 {
 	switch( kernel ) {
 	case VIPS_KERNEL_NEAREST:
@@ -166,10 +166,10 @@ vips_resize_interpolate( VipsKernel kernel )
 }
 
 static int
-vips_resize_build( VipsObject *object )
+vips_alpha_resize_build( VipsObject *object )
 {
 	VipsResample *resample = VIPS_RESAMPLE( object );
-	VipsResize *resize = (VipsResize *) object;
+	VipsAlphaResize *resize = (VipsAlphaResize *) object;
 
 	VipsImage **t = (VipsImage **) vips_object_local_array( object, 9 );
 
@@ -243,7 +243,6 @@ vips_resize_build( VipsObject *object )
 	hscale = VIPS_MAX( hscale, 1.0 / in->Xsize );
 	vscale = VIPS_MAX( vscale, 1.0 / in->Ysize );
 
-	//TODO: Don't convert colorspace, support all interpretations in reducev and reduceh
 	if( vips_colourspace( in, &t[6], VIPS_INTERPRETATION_RGB16, NULL) )
 		return( -1 );
 	in = t[6];
@@ -369,7 +368,7 @@ vips_resize_build( VipsObject *object )
 }
 
 static void
-vips_resize_class_init( VipsResizeClass *class )
+vips_alpha_resize_class_init( VipsAlphaResizeClass *class )
 {
 	GObjectClass *gobject_class = G_OBJECT_CLASS( class );
 	VipsObjectClass *vobject_class = VIPS_OBJECT_CLASS( class );
@@ -390,21 +389,21 @@ vips_resize_class_init( VipsResizeClass *class )
 		_( "Scale factor" ), 
 		_( "Scale image by this factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
-		G_STRUCT_OFFSET( VipsResize, scale ),
+		G_STRUCT_OFFSET( VipsAlphaResize, scale ),
 		0, 10000000, 0 );
 
 	VIPS_ARG_DOUBLE( class, "vscale", 113, 
 		_( "Vertical scale factor" ), 
 		_( "Vertical scale image by this factor" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsResize, vscale ),
+		G_STRUCT_OFFSET( VipsAlphaResize, vscale ),
 		0, 10000000, 0 );
 
 	VIPS_ARG_ENUM( class, "kernel", 3, 
 		_( "Kernel" ), 
 		_( "Resampling kernel" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsResize, kernel ),
+		G_STRUCT_OFFSET( VipsAlphaResize, kernel ),
 		VIPS_TYPE_KERNEL, VIPS_KERNEL_LANCZOS3 );
 
 	/* We used to let people set the input offset so you could pick centre
@@ -414,14 +413,14 @@ vips_resize_class_init( VipsResizeClass *class )
 		_( "Input offset" ), 
 		_( "Horizontal input displacement" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsResize, idx ),
+		G_STRUCT_OFFSET( VipsAlphaResize, idx ),
 		-10000000, 10000000, 0 );
 
 	VIPS_ARG_DOUBLE( class, "idy", 116, 
 		_( "Input offset" ), 
 		_( "Vertical input displacement" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsResize, idy ),
+		G_STRUCT_OFFSET( VipsAlphaResize, idy ),
 		-10000000, 10000000, 0 );
 
 	/* It's a kernel now we use vips_reduce() not vips_affine().
@@ -430,7 +429,7 @@ vips_resize_class_init( VipsResizeClass *class )
 		_( "Interpolate" ), 
 		_( "Interpolate pixels with this" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED, 
-		G_STRUCT_OFFSET( VipsResize, interpolate ) );
+		G_STRUCT_OFFSET( VipsAlphaResize, interpolate ) );
 
 	/* We used to let people pick centre or corner, but it's automatic now.
 	 */
@@ -438,19 +437,19 @@ vips_resize_class_init( VipsResizeClass *class )
 		_( "Centre" ), 
 		_( "Use centre sampling convention" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsResize, centre ),
+		G_STRUCT_OFFSET( VipsAlphaResize, centre ),
 		FALSE );
 
 }
 
 static void
-vips_resize_init( VipsResize *resize )
+vips_alpha_resize_init( VipsAlphaResize *resize )
 {
 	resize->kernel = VIPS_KERNEL_LANCZOS3;
 }
 
 /**
- * vips_resize: (method)
+ * vips_alpha_resize: (method)
  * @in: input image
  * @out: (out): output image
  * @scale: scale factor
@@ -494,14 +493,14 @@ vips_resize_init( VipsResize *resize )
  * Returns: 0 on success, -1 on error
  */
 int
-vips_resize( VipsImage *in, VipsImage **out, 
+vips_alpha_resize( VipsImage *in, VipsImage **out,
 	double scale, ... )
 {
 	va_list ap;
 	int result;
 
 	va_start( ap, scale );
-	result = vips_call_split( "resize", ap, in, out, scale );
+	result = vips_call_split( "alpha_resize", ap, in, out, scale );
 	va_end( ap );
 
 	return( result );

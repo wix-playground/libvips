@@ -2,8 +2,8 @@
 // Created by Alon Neubach on 01/06/2020.
 //
 
-#ifndef LIBVIPS_REDUCE_H
-#define LIBVIPS_REDUCE_H
+#ifndef LIBVIPS_ALPHA_REDUCE_H
+#define LIBVIPS_ALPHA_REDUCE_H
 
 #define EPSILON  (1.0e-12)
 
@@ -123,4 +123,4 @@ static void reduce_inner_dimension(
 	} // for i
 }
 
-#endif //LIBVIPS_REDUCE_H
+#endif //LIBVIPS_ALPHA_REDUCE_H
