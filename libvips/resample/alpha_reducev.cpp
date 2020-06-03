@@ -91,7 +91,7 @@ vips_alpha_reducev_gen( VipsRegion *out_region, void *seq,
                         void *void_in, void *void_reducev, gboolean *stop )
 {
 	VipsImage *in = (VipsImage *) void_in;
-	VipsReducev *reducev = (VipsAlphaReducev *) void_reducev;
+	VipsAlphaReducev *reducev = (VipsAlphaReducev *) void_reducev;
 	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
 
@@ -217,7 +217,7 @@ vips_alpha_reducev_build( VipsObject *object )
 
 	VipsImage *in;
 
-	if( VIPS_OBJECT_CLASS( vips_reducev_parent_class )->build( object ) )
+	if( VIPS_OBJECT_CLASS( vips_alpha_reducev_parent_class )->build( object ) )
 		return( -1 );
 
 	in = resample->in; 
@@ -237,7 +237,7 @@ vips_alpha_reducev_build( VipsObject *object )
 		return( -1 );
 	in = t[0];
 
-	if( vips_reducev_raw( reducev, in, &t[2] ) )
+	if( vips_alpha_reducev_raw( reducev, in, &t[2] ) )
 		return( -1 );
 	in = t[2];
 
@@ -291,12 +291,12 @@ vips_alpha_reducev_class_init( VipsAlphaReducevClass *reducev_class )
 		_( "Vshrink" ), 
 		_( "Vertical shrink factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
-		G_STRUCT_OFFSET( VipsReducev, vshrink ),
+		G_STRUCT_OFFSET( VipsAlphaReducev, vshrink ),
 		1, 1000000, 1 );
 }
 
 static void
-vips_alpha_reducev_init( VipsReducev *reducev )
+vips_alpha_reducev_init( VipsAlphaReducev *reducev )
 {
 }
 

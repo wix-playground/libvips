@@ -170,6 +170,7 @@ vips_resample_operation_init( void )
 	extern GType vips_similarity_get_type( void ); 
 	extern GType vips_rotate_get_type( void ); 
 	extern GType vips_resize_get_type( void ); 
+	extern GType vips_alpha_resize_get_type( void );
 
 	vips_thumbnail_file_get_type(); 
 	vips_thumbnail_buffer_get_type(); 

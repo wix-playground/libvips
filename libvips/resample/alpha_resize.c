@@ -90,15 +90,6 @@ typedef struct _VipsAlphaResize {
 
 	double scale;
 	double vscale;
-	VipsKernel kernel;
-
-	/* Deprecated.
-	 */
-	VipsInterpolate *interpolate;
-	double idx;
-	double idy;
-	gboolean centre;
-
 } VipsAlphaResize;
 
 typedef VipsResampleClass VipsAlphaResizeClass;
@@ -121,53 +112,13 @@ G_DEFINE_TYPE( VipsAlphaResize, vips_alpha_resize, VIPS_TYPE_RESAMPLE );
 static int
 vips_alpha_resize_int_shrink( VipsAlphaResize *resize, double scale )
 {
-	int shrink;
-
-	if( scale > 1.0 )
-		shrink = 1;
-	else
-		switch( resize->kernel ) { 
-		case VIPS_KERNEL_NEAREST:
-			shrink = 1; 
-			break;
-
-		case VIPS_KERNEL_LINEAR:
-		case VIPS_KERNEL_CUBIC:
-		case VIPS_KERNEL_MITCHELL:
-		case VIPS_KERNEL_LANCZOS2:
-		case VIPS_KERNEL_LANCZOS3:
-		default:
-			shrink = VIPS_MAX( 1, VIPS_FLOOR( 1.0 / (scale * 2) ) );
-			break;
-		}
-
-	return( shrink );
-}
-
-/* Suggest a VipsInterpolate which corresponds to a VipsKernel. We use
- * this to pick a thing for affine().
- */
-static const char *
-vips_alpha_resize_interpolate( VipsKernel kernel )
-{
-	switch( kernel ) {
-	case VIPS_KERNEL_NEAREST:
-	     return( "nearest" ); 
-
-	case VIPS_KERNEL_LINEAR:
-	     return( "bilinear" ); 
-
-	/* Use cubic for everything else. There are other interpolators, like
-	 * nohalo, but they don't really correspond well to any kernel.
-	 */
-	default:
-	     return( "bicubic" ); 
-	}
+	return VIPS_MAX( 1, VIPS_FLOOR( 1.0 / (scale * 2) ) );
 }
 
 static int
 vips_alpha_resize_build( VipsObject *object )
 {
+	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( object );
 	VipsResample *resample = VIPS_RESAMPLE( object );
 	VipsAlphaResize *resize = (VipsAlphaResize *) object;
 
@@ -179,7 +130,7 @@ vips_alpha_resize_build( VipsObject *object )
 	int int_hshrink;
 	int int_vshrink;
 
-	if( VIPS_OBJECT_CLASS( vips_resize_parent_class )->build( object ) )
+	if( class->build( object ) )
 		return( -1 );
 
 	in = resample->in;
@@ -194,8 +145,8 @@ vips_alpha_resize_build( VipsObject *object )
 
 	/* The int part of our scale.
 	 */
-	int_hshrink = vips_resize_int_shrink( resize, hscale );
-	int_vshrink = vips_resize_int_shrink( resize, vscale );
+	int_hshrink = vips_alpha_resize_int_shrink( resize, hscale );
+	int_vshrink = vips_alpha_resize_int_shrink( resize, vscale );
 
 	//temp temp temp
 //	int_hshrink = 1;
@@ -253,30 +204,21 @@ vips_alpha_resize_build( VipsObject *object )
 		if( hscale < 1.0 ) {
 			g_info( "residual reduceh by %g",
 			        hscale );
-			if( vips_reduceh( in, &t[3], 1.0 / hscale,
-			                  "kernel", resize->kernel,
-			                  "centre", TRUE,
-			                  NULL ) )
+			if( vips_alpha_reduceh( in, &t[3], 1.0 / hscale, NULL ) )
 				return (-1);
 			in = t[3];
 		}
 
 		if( vscale < 1.0 ) {
 			g_info( "residual reducev by %g", vscale );
-			if( vips_reducev( in, &t[2], 1.0 / vscale,
-			                  "kernel", resize->kernel,
-			                  "centre", TRUE,
-			                  NULL ) )
+			if( vips_alpha_reducev( in, &t[2], 1.0 / vscale, NULL ) )
 				return (-1);
 			in = t[2];
 		}
 	} else {
 		if( vscale < 1.0 ) {
 			g_info( "residual reducev by %g", vscale );
-			if( vips_reducev( in, &t[2], 1.0 / vscale,
-			                  "kernel", resize->kernel,
-			                  "centre", TRUE,
-			                  NULL ) )
+			if( vips_alpha_reducev( in, &t[2], 1.0 / vscale, NULL ) )
 				return (-1);
 			in = t[2];
 		}
@@ -284,81 +226,18 @@ vips_alpha_resize_build( VipsObject *object )
 		if( hscale < 1.0 ) {
 			g_info( "residual reduceh by %g",
 			        hscale );
-			if( vips_reduceh( in, &t[3], 1.0 / hscale,
-			                  "kernel", resize->kernel,
-			                  "centre", TRUE,
-			                  NULL ) )
+			if( vips_alpha_reduceh( in, &t[3], 1.0 / hscale, NULL ) )
 				return (-1);
 			in = t[3];
 		}
 	}
 
-	/* Any upsizing.
+	/* upsizing is not supported
 	 */
 	if( hscale > 1.0 ||
-		vscale > 1.0 ) { 
-		const char *nickname = 
-			vips_resize_interpolate( resize->kernel );
-
-		/* Input displacement. For centre sampling, shift by 0.5 down
-		 * and right. Except if this is nearest, which is always
-		 * centre.
-		 */
-		const double id = 
-			resize->kernel == VIPS_KERNEL_NEAREST ? 
-			0.0 : 0.5;
-
-		VipsInterpolate *interpolate;
-
-		if( !(interpolate = vips_interpolate_new( nickname )) )
-			return( -1 ); 
-		vips_object_local( object, interpolate );
-
-		if( resize->kernel == VIPS_KERNEL_NEAREST &&
-			hscale == VIPS_FLOOR( hscale ) &&
-			vscale == VIPS_FLOOR( vscale ) ) {
-			/* Fast, integral nearest neighbour enlargement
-			 */
-			if( vips_zoom( in, &t[4], VIPS_FLOOR( hscale ),
-				VIPS_FLOOR( vscale ), NULL ) )
-				return( -1 );
-			in = t[4];
-		}
-		else if( hscale > 1.0 &&
-			vscale > 1.0 ) { 
-			g_info( "residual scale %g x %g", hscale, vscale );
-			if( vips_affine( in, &t[4], 
-				hscale, 0.0, 0.0, vscale, 
-				"interpolate", interpolate, 
-				"idx", id, 
-				"idy", id, 
-				"extend", VIPS_EXTEND_COPY, 
-				NULL ) )  
-				return( -1 );
-			in = t[4];
-		}
-		else if( hscale > 1.0 ) { 
-			g_info( "residual scale %g", hscale );
-			if( vips_affine( in, &t[4], hscale, 0.0, 0.0, 1.0, 
-				"interpolate", interpolate, 
-				"idx", id, 
-				"idy", id, 
-				"extend", VIPS_EXTEND_COPY, 
-				NULL ) )  
-				return( -1 );
-			in = t[4];
-		}
-		else { 
-			g_info( "residual scale %g", vscale );
-			if( vips_affine( in, &t[4], 1.0, 0.0, 0.0, vscale, 
-				"interpolate", interpolate, 
-				"idx", id, 
-				"idy", id, 
-				"extend", VIPS_EXTEND_COPY, 
-				NULL ) )  
-				return( -1 );
-			in = t[4];
-		}
+		vscale > 1.0 ) {
+		vips_error(class->nickname, "alpha_resize doesn't support upsizing");
+		return( -1 );
 	}
 
 	if( vips_image_write( in, resample->out ) )
@@ -379,9 +258,9 @@ vips_alpha_resize_class_init( VipsAlphaResizeClass *class )
 	gobject_class->set_property = vips_object_set_property;
 	gobject_class->get_property = vips_object_get_property;
 
-	vobject_class->nickname = "resize";
-	vobject_class->description = _( "resize an image" );
-	vobject_class->build = vips_resize_build;
+	vobject_class->nickname = "alpha_resize";
+	vobject_class->description = _( "resize an image with alpha" );
+	vobject_class->build = vips_alpha_resize_build;
 
 	operation_class->flags = VIPS_OPERATION_SEQUENTIAL;
 
@@ -399,53 +278,11 @@ vips_alpha_resize_class_init( VipsAlphaResizeClass *class )
 		G_STRUCT_OFFSET( VipsAlphaResize, vscale ),
 		0, 10000000, 0 );
 
-	VIPS_ARG_ENUM( class, "kernel", 3, 
-		_( "Kernel" ), 
-		_( "Resampling kernel" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsAlphaResize, kernel ),
-		VIPS_TYPE_KERNEL, VIPS_KERNEL_LANCZOS3 );
-
-	/* We used to let people set the input offset so you could pick centre
-	 * or corner interpolation, but it's not clear this was useful. 
-	 */
-	VIPS_ARG_DOUBLE( class, "idx", 115, 
-		_( "Input offset" ), 
-		_( "Horizontal input displacement" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsAlphaResize, idx ),
-		-10000000, 10000000, 0 );
-
-	VIPS_ARG_DOUBLE( class, "idy", 116, 
-		_( "Input offset" ), 
-		_( "Vertical input displacement" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsAlphaResize, idy ),
-		-10000000, 10000000, 0 );
-
-	/* It's a kernel now we use vips_reduce() not vips_affine().
-	 */
-	VIPS_ARG_INTERPOLATE( class, "interpolate", 2, 
-		_( "Interpolate" ), 
-		_( "Interpolate pixels with this" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED, 
-		G_STRUCT_OFFSET( VipsAlphaResize, interpolate ) );
-
-	/* We used to let people pick centre or corner, but it's automatic now.
-	 */
-	VIPS_ARG_BOOL( class, "centre", 7, 
-		_( "Centre" ), 
-		_( "Use centre sampling convention" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsAlphaResize, centre ),
-		FALSE );
-
 }
 
 static void
 vips_alpha_resize_init( VipsAlphaResize *resize )
 {
-	resize->kernel = VIPS_KERNEL_LANCZOS3;
 }
 
 /**

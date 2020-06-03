@@ -12,6 +12,7 @@ libresample_la_SOURCES = \
 	shrinkh.c \
 	shrinkv.c \
 	reduce.c \
+	alpha_reduce.c \
 	reduceh.cpp \
 	alpha_reduceh.cpp \
 	reducev.cpp \

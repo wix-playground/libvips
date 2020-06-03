@@ -98,7 +98,7 @@
  */
 
 /**
- * vips_reduceh: (method)
+ * vips_alpha_reduceh: (method)
  * @in: input image
  * @out: (out): output image
  * @hshrink: horizontal reduce
@@ -126,45 +126,31 @@
  * Returns: 0 on success, -1 on error
  */
 
-typedef struct _VipsReduce {
+typedef struct _VipsAlphaReduce {
 	VipsResample parent_instance;
 
 	double hshrink;		/* Shrink factors */
 	double vshrink;
 
-	/* The thing we use to make the kernel.
-	 */
-	VipsKernel kernel;
+} VipsAlphaReduce;
 
-	/* Use centre rather than corner sampling convention.
-	 */
-	gboolean centre;
+typedef VipsResampleClass VipsAlphaReduceClass;
 
-} VipsReduce;
-
-typedef VipsResampleClass VipsReduceClass;
-
-G_DEFINE_TYPE( VipsReduce, vips_reduce, VIPS_TYPE_RESAMPLE );
+G_DEFINE_TYPE( VipsAlphaReduce, vips_alpha_reduce, VIPS_TYPE_RESAMPLE );
 
 static int
-vips_reduce_build( VipsObject *object )
+vips_alpha_reduce_build( VipsObject *object )
 {
 	VipsResample *resample = VIPS_RESAMPLE( object );
-	VipsReduce *reduce = (VipsReduce *) object;
+	VipsAlphaReduce *reduce = (VipsAlphaReduce *) object;
 	VipsImage **t = (VipsImage **) 
 		vips_object_local_array( object, 3 );
 
-	if( VIPS_OBJECT_CLASS( vips_reduce_parent_class )->build( object ) )
+	if( VIPS_OBJECT_CLASS( vips_alpha_reduce_parent_class )->build( object ) )
 		return( -1 );
 
-	if( vips_reducev( resample->in, &t[0], reduce->vshrink, 
-		"kernel", reduce->kernel, 
-		"centre", reduce->centre, 
-		NULL ) ||
-		vips_reduceh( t[0], &t[1], reduce->hshrink, 
-			"kernel", reduce->kernel, 
-			"centre", reduce->centre, 
-			NULL ) ||
+	if( vips_alpha_reducev( resample->in, &t[0], reduce->vshrink, NULL ) ||
+		vips_reduceh( t[0], &t[1], reduce->hshrink, NULL ) ||
 		vips_image_write( t[1], resample->out ) )
 		return( -1 );
 
@@ -172,20 +158,20 @@ vips_reduce_build( VipsObject *object )
 }
 
 static void
-vips_reduce_class_init( VipsReduceClass *class )
+vips_alpha_reduce_class_init( VipsAlphaReduceClass *class )
 {
 	GObjectClass *gobject_class = G_OBJECT_CLASS( class );
 	VipsObjectClass *vobject_class = VIPS_OBJECT_CLASS( class );
 	VipsOperationClass *operation_class = VIPS_OPERATION_CLASS( class );
 
-	VIPS_DEBUG_MSG( "vips_reduce_class_init\n" );
+	VIPS_DEBUG_MSG( "vips_alpha_reduce_class_init\n" );
 
 	gobject_class->set_property = vips_object_set_property;
 	gobject_class->get_property = vips_object_get_property;
 
-	vobject_class->nickname = "reduce";
-	vobject_class->description = _( "reduce an image" );
-	vobject_class->build = vips_reduce_build;
+	vobject_class->nickname = "alpha_reduce";
+	vobject_class->description = _( "reduce an image with alpha" );
+	vobject_class->build = vips_alpha_reduce_build;
 
 	operation_class->flags = VIPS_OPERATION_SEQUENTIAL;
 
@@ -193,56 +179,25 @@ vips_reduce_class_init( VipsReduceClass *class )
 		_( "Hshrink" ), 
 		_( "Horizontal shrink factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
-		G_STRUCT_OFFSET( VipsReduce, hshrink ),
+		G_STRUCT_OFFSET( VipsAlphaReduce, hshrink ),
 		1.0, 1000000.0, 1.0 );
 
 	VIPS_ARG_DOUBLE( class, "vshrink", 9, 
 		_( "Vshrink" ), 
 		_( "Vertical shrink factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
-		G_STRUCT_OFFSET( VipsReduce, vshrink ),
-		1.0, 1000000.0, 1.0 );
-
-	VIPS_ARG_ENUM( class, "kernel", 3, 
-		_( "Kernel" ), 
-		_( "Resampling kernel" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsReduce, kernel ),
-		VIPS_TYPE_KERNEL, VIPS_KERNEL_LANCZOS3 );
-
-	VIPS_ARG_BOOL( class, "centre", 7, 
-		_( "Centre" ), 
-		_( "Use centre sampling convention" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsReduce, centre ),
-		FALSE );
-
-	/* The old names .. now use h and v everywhere. 
-	 */
-	VIPS_ARG_DOUBLE( class, "xshrink", 8, 
-		_( "Xshrink" ), 
-		_( "Horizontal shrink factor" ),
-		VIPS_ARGUMENT_REQUIRED_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsReduce, hshrink ),
-		1.0, 1000000.0, 1.0 );
-
-	VIPS_ARG_DOUBLE( class, "yshrink", 9, 
-		_( "Yshrink" ), 
-		_( "Vertical shrink factor" ),
-		VIPS_ARGUMENT_REQUIRED_INPUT | VIPS_ARGUMENT_DEPRECATED,
-		G_STRUCT_OFFSET( VipsReduce, vshrink ),
+		G_STRUCT_OFFSET( VipsAlphaReduce, vshrink ),
 		1.0, 1000000.0, 1.0 );
 
 }
 
 static void
-vips_reduce_init( VipsReduce *reduce )
+vips_alpha_reduce_init( VipsAlphaReduce *reduce )
 {
-	reduce->kernel = VIPS_KERNEL_LANCZOS3;
 }
 
 /**
- * vips_reduce: (method)
+ * vips_alpha_reduce: (method)
  * @in: input image
  * @out: (out): output image
  * @hshrink: horizontal shrink
@@ -271,14 +226,14 @@ vips_reduce_init( VipsReduce *reduce )
  * Returns: 0 on success, -1 on error
  */
 int
-vips_reduce( VipsImage *in, VipsImage **out, 
+vips_alpha_reduce( VipsImage *in, VipsImage **out,
 	double hshrink, double vshrink, ... )
 {
 	va_list ap;
 	int result;
 
 	va_start( ap, vshrink );
-	result = vips_call_split( "reduce", ap, in, out, hshrink, vshrink );
+	result = vips_call_split( "alpha_reduce", ap, in, out, hshrink, vshrink );
 	va_end( ap );
 
 	return( result );

@@ -215,7 +215,7 @@ class TestResample:
         print('new height %s' % new_height)
         # im = im.colourspace('rgb16')
 
-        kernel = 'approx-lanczos3'
+        kernel = 'lanczos3'
         print('new_width / im.width=', new_width / im.width)
         im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
 

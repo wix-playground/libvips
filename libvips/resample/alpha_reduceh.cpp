@@ -64,7 +64,7 @@ typedef struct _VipsAlphaReduceh {
 	double hshrink;		/* Reduce factor */
 } VipsAlphaReduceh;
 
-typedef VipsResampleClass VipsReducehClass;
+typedef VipsResampleClass VipsAlphaReducehClass;
 
 /* We need C linkage for this.
  */
@@ -79,7 +79,7 @@ vips_alpha_reduceh_gen( VipsRegion *out_region, void *seq,
                   void *void_in, void *void_reduceh, gboolean *stop )
 {
 	VipsImage *in = (VipsImage *) void_in;
-	VipsAlphaReduceh *reduceh = (VipsAlphaReduceh *) void_alpha_reduceh;
+	VipsAlphaReduceh *reduceh = (VipsAlphaReduceh *) void_reduceh;
 	VipsRegion *ir = (VipsRegion *) seq;
 	VipsRect *r = &out_region->valid;
 
@@ -169,7 +169,7 @@ vips_alpha_reduceh_build( VipsObject *object )
 
 	VipsImage *in;
 
-	if( VIPS_OBJECT_CLASS( vips_reduceh_parent_class )->build( object ) )
+	if( VIPS_OBJECT_CLASS( vips_alpha_reduceh_parent_class )->build( object ) )
 		return( -1 );
 
 	in = resample->in;
@@ -250,12 +250,12 @@ vips_alpha_reduceh_class_init( VipsAlphaReducehClass *reduceh_class )
 		_( "Hshrink" ),
 		_( "Horizontal shrink factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
-		G_STRUCT_OFFSET( VipsReduceh, hshrink ),
+		G_STRUCT_OFFSET( VipsAlphaReduceh, hshrink ),
 		1, 1000000, 1 );
 }
 
 static void
-vips_alpha_reduceh_init( VipsReduceh *reduceh )
+vips_alpha_reduceh_init( VipsAlphaReduceh *reduceh )
 {
 }
 
