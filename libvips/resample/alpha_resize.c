@@ -86,31 +86,23 @@
 #include "presample.h"
 
 typedef struct _VipsAlphaResize {
-	VipsResample parent_instance;
+	VipsOperation parent_instance;
+
+	VipsImage *in;
+	VipsImage *out;
 
 	double scale;
 	double vscale;
 } VipsAlphaResize;
 
-typedef VipsResampleClass VipsAlphaResizeClass;
+typedef VipsOperationClass VipsAlphaResizeClass;
 
-G_DEFINE_TYPE( VipsAlphaResize, vips_alpha_resize, VIPS_TYPE_RESAMPLE );
+G_DEFINE_TYPE( VipsAlphaResize, vips_alpha_resize, VIPS_TYPE_OPERATION );
 
 /* How much of a scale should be by an integer shrink factor?
- *
- * This depends on the scale and the kernel we will use for residual resizing.
- * For upsizing and nearest-neighbour downsize, we want no shrinking. 
- *
- * The others are adaptive: the size of the kernel changes with the shrink 
- * factor. We will get the best quality (but be the slowest) if we let 
- * reduce do all the work. Leave it the final 200 - 300% to do as a compromise 
- * for efficiency. 
- *
- * FIXME: this is rather ugly. Kernel should be a class and this info should be
- * stored in there. 
  */
 static int
-vips_alpha_resize_int_shrink( VipsAlphaResize *resize, double scale )
+vips_alpha_resize_int_shrink( double scale )
 {
 	return VIPS_MAX( 1, VIPS_FLOOR( 1.0 / (scale * 2) ) );
 }
@@ -118,35 +110,18 @@ vips_alpha_resize_int_shrink( VipsAlphaResize *resize, double scale )
 static int
 vips_alpha_resize_build( VipsObject *object )
 {
-	VipsObjectClass *class = VIPS_OBJECT_GET_CLASS( object );
-	VipsResample *resample = VIPS_RESAMPLE( object );
 	VipsAlphaResize *resize = (VipsAlphaResize *) object;
 
 	VipsImage **t = (VipsImage **) vips_object_local_array( object, 9 );
 
-	VipsImage *in;
-	double hscale;
-	double vscale;
-	int int_hshrink;
-	int int_vshrink;
+	VipsImage *in = resize->in;
+	double hscale = resize->scale;
+	double vscale = vips_object_argument_isset( object, "vscale" ) ?
+		resize->vscale : resize->scale;
+	int int_hshrink = vips_alpha_resize_int_shrink( hscale );
+	int int_vshrink = vips_alpha_resize_int_shrink( vscale );
 
-	if( class->build( object ) )
-		return( -1 );
-
-	in = resample->in;
-
-	/* Updated below when we do the int part of our shrink.
-	 */
-	hscale = resize->scale;
-	if( vips_object_argument_isset( object, "vscale" ) ) 
-		vscale = resize->vscale;
-	else
-		vscale = resize->scale;
-
-	/* The int part of our scale.
-	 */
-	int_hshrink = vips_alpha_resize_int_shrink( resize, hscale );
-	int_vshrink = vips_alpha_resize_int_shrink( resize, vscale );
+	g_object_set( resize, "out", vips_image_new(), NULL );
 
 	//temp temp temp
 //	int_hshrink = 1;
@@ -236,11 +211,12 @@ vips_alpha_resize_build( VipsObject *object )
 	 */
 	if( hscale > 1.0 ||
 		vscale > 1.0 ) {
-		vips_error(class->nickname, "alpha_resize doesn't support upsizing");
+		vips_error( VIPS_OBJECT_GET_CLASS( vips_alpha_resize_parent_class )->nickname,
+			"alpha_resize doesn't support upsizing");
 		return( -1 );
 	}
 
-	if( vips_image_write( in, resample->out ) )
+	if( vips_image_write( in, resize->out ) )
 		return( -1 ); 
 
 	return( 0 );
@@ -253,7 +229,7 @@ vips_alpha_resize_class_init( VipsAlphaResizeClass *class )
 	VipsObjectClass *vobject_class = VIPS_OBJECT_CLASS( class );
 	VipsOperationClass *operation_class = VIPS_OPERATION_CLASS( class );
 
-	VIPS_DEBUG_MSG( "vips_resize_class_init\n" );
+	VIPS_DEBUG_MSG( "vips_alpha_resize_class_init\n" );
 
 	gobject_class->set_property = vips_object_set_property;
 	gobject_class->get_property = vips_object_get_property;
@@ -264,14 +240,26 @@ vips_alpha_resize_class_init( VipsAlphaResizeClass *class )
 
 	operation_class->flags = VIPS_OPERATION_SEQUENTIAL;
 
-	VIPS_ARG_DOUBLE( class, "scale", 113, 
+	VIPS_ARG_IMAGE( class, "in", 1,
+	                _( "Input" ),
+	                _( "Input image" ),
+	                VIPS_ARGUMENT_REQUIRED_INPUT,
+	                G_STRUCT_OFFSET( VipsAlphaResize, in ) );
+
+	VIPS_ARG_IMAGE( class, "out", 2,
+	                _( "Output" ),
+	                _( "Output image" ),
+	                VIPS_ARGUMENT_REQUIRED_OUTPUT,
+	                G_STRUCT_OFFSET( VipsAlphaResize, out ) );
+
+	VIPS_ARG_DOUBLE( class, "scale", 3,
 		_( "Scale factor" ), 
 		_( "Scale image by this factor" ),
 		VIPS_ARGUMENT_REQUIRED_INPUT,
 		G_STRUCT_OFFSET( VipsAlphaResize, scale ),
 		0, 10000000, 0 );
 
-	VIPS_ARG_DOUBLE( class, "vscale", 113, 
+	VIPS_ARG_DOUBLE( class, "vscale", 4,
 		_( "Vertical scale factor" ), 
 		_( "Vertical scale image by this factor" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,

@@ -215,9 +215,8 @@ class TestResample:
         print('new height %s' % new_height)
         # im = im.colourspace('rgb16')
 
-        kernel = 'lanczos3'
         print('new_width / im.width=', new_width / im.width)
-        im = im.resize(new_width / im.width, vscale=new_height / im.height, kernel=kernel)
+        im = im.alpha_resize(new_width / im.width, vscale=new_height / im.height)
 
         print('Writing resized')
         im.write_to_file('%s.resized-lanczos%s' % (filename, ext))
