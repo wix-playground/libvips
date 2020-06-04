@@ -101,7 +101,10 @@ int vips_affine( VipsImage *in, VipsImage **out,
 int vips_resize( VipsImage *in, VipsImage **out, double scale, ... )
 	__attribute__((sentinel));
 
-int vips_mapim( VipsImage *in, VipsImage **out, VipsImage *index, ... ) 
+int vips_alpha_resize( VipsImage *in, VipsImage **out, double scale, ... )
+	__attribute__((sentinel));
+
+int vips_mapim( VipsImage *in, VipsImage **out, VipsImage *index, ... )
 	__attribute__((sentinel));
 
 int vips_quadratic( VipsImage *in, VipsImage **out, VipsImage *coeff, ... )
