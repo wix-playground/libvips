@@ -112,11 +112,9 @@ vips_alpha_reducev_gen( VipsRegion *out_region, void *seq,
 	};
 
 #ifdef DEBUG
-	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
+	printf( "vips_alpha_reducev_gen: generating %d x %d at %d x %d\n",
 		r->width, r->height, r->left, r->top );
 #endif /*DEBUG*/
-	printf( "vips_reducev_gen: generating %d x %d at %d x %d\n",
-	        r->width, r->height, r->left, r->top );
 
 	if( vips_region_prepare( ir, &s ) )
 		return( -1 );
@@ -126,7 +124,7 @@ vips_alpha_reducev_gen( VipsRegion *out_region, void *seq,
 	int source_inner_stride = VIPS_IMAGE_SIZEOF_PEL( in );
 	int destination_inner_stride = VIPS_IMAGE_SIZEOF_PEL( out_region->im );
 
-	VIPS_GATE_START( "vips_reducev_gen: work" );
+	VIPS_GATE_START( "vips_alpha_reducev_gen: work" );
 
 	int outer_dimension_size = r->height;
 	int max_source_size = in->Ysize;
@@ -154,9 +152,9 @@ vips_alpha_reducev_gen( VipsRegion *out_region, void *seq,
 		q += destination_outer_stride;
 	}
 
-	VIPS_GATE_STOP( "vips_reducev_gen: work" );
+	VIPS_GATE_STOP( "vips_alpha_reducev_gen: work" );
 
-	VIPS_COUNT_PIXELS( out_region, "vips_reducev_gen" );
+	VIPS_COUNT_PIXELS( out_region, "vips_alpha_reducev_gen" );
 
 	return( 0 );
 }
@@ -189,13 +187,10 @@ vips_alpha_reducev_raw( VipsAlphaReducev *reducev, VipsImage *in, VipsImage **ou
 	}
 
 #ifdef DEBUG
-	printf( "vips_reducev_build: reducing %d x %d image to %d x %d\n", 
+	printf( "vips_alpha_reducev_build: reducing %d x %d image to %d x %d\n",
 		in->Xsize, in->Ysize, 
 		(*out)->Xsize, (*out)->Ysize );  
 #endif /*DEBUG*/
-	printf( "vips_reducev_build: reducing %d x %d image to %d x %d\n",
-	        in->Xsize, in->Ysize,
-	        (*out)->Xsize, (*out)->Ysize );
 
 	if( vips_image_generate( *out,
 		vips_start_one, vips_alpha_reducev_gen, vips_stop_one,
