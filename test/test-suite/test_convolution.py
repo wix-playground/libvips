@@ -247,16 +247,6 @@ class TestConvolution:
             sharp = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
             sharp.write_to_file('%s.sharpened-rgb.png' % path)
 
-        # def test_unsharpmask_no_alpha(self):
-        #     im = pyvips.Image.new_from_file(PNG_FILE)
-        #     sharp = im.unsharpmask(radius=0.66, amount=1.0, threshold=0.01)
-        #     sharp.write_to_file('%s.unsharpmasked.png' % PNG_FILE)
-        #
-        # def test_unsharpmask_with_alpha(self):
-        #     im = pyvips.Image.new_from_file(LOGO2_PNG_FILE)
-        #     sharp = im.unsharpmask(radius=0.66, amount=1.0, threshold=0.01)
-        #     sharp.write_to_file('%s.unsharpmasked.png' % LOGO2_PNG_FILE)
-
     def test_sharpen(self):
         for im in self.all_images:
             for fmt in noncomplex_formats:
