@@ -38,7 +38,7 @@ VIPS_VERSION_STRING=$VIPS_VERSION-`date -u -r ChangeLog`
 #   binary interface changes not backwards compatible?: reset age to 0
 
 LIBRARY_CURRENT=54
-LIBRARY_REVISION=2
+LIBRARY_REVISION=3
 LIBRARY_AGE=12
 
 # patched into include/vips/version.h
@@ -450,40 +450,9 @@ AC_CHECK_LIB(m,cbrt,[AC_DEFINE(HAVE_CBRT,1,[have cbrt() in libm.])])
 AC_CHECK_LIB(m,hypot,[AC_DEFINE(HAVE_HYPOT,1,[have hypot() in libm.])])
 AC_CHECK_LIB(m,atan2,[AC_DEFINE(HAVE_ATAN2,1,[have atan2() in libm.])])
 
-# have to have these
-# need glib 2.6 for GOption
-PKG_CHECK_MODULES(REQUIRED, glib-2.0 >= 2.6 gmodule-2.0 gobject-2.0)
-PACKAGES_USED="$PACKAGES_USED glib-2.0 gmodule-2.0 gobject-2.0"
-
-# from 2.12 we have g_base64_encode()
-PKG_CHECK_MODULES(BASE64_ENCODE, glib-2.0 >= 2.12,
-  [AC_DEFINE(HAVE_BASE64_ENCODE,1,
-	    [define if your glib has g_base64_encode().]
-   )
-  ],
-  [:
-  ]
-)
-
-# from 2.14 we have g_option_context_get_help()
-PKG_CHECK_MODULES(CONTEXT_GET_HELP, glib-2.0 >= 2.14,
-  [AC_DEFINE(HAVE_CONTEXT_GET_HELP,1,
-	    [define if your glib has g_option_context_get_help().]
-   )
-  ],
-  [:
-  ]
-)
-
-# from 2.15 we have GIO
-PKG_CHECK_MODULES(GIO, glib-2.0 >= 2.15,
-  [AC_DEFINE(HAVE_GIO,1,
-	    [define if your glib has GIO.]
-   )
-  ],
-  [:
-  ]
-)
+# have to have these parts of glib ... we need glib 2.15 for gio
+PKG_CHECK_MODULES(REQUIRED, glib-2.0 >= 2.15 gmodule-2.0 gobject-2.0 gio-2.0)
+PACKAGES_USED="$PACKAGES_USED glib-2.0 gmodule-2.0 gobject-2.0 gio-2.0"
 
 # from 2.28 we have a monotonic timer
 PKG_CHECK_MODULES(MONOTONIC_TIME, glib-2.0 >= 2.28,
@@ -505,11 +474,8 @@ PKG_CHECK_MODULES(DATE_TIME_FORMAT_ISO8601, glib-2.0 >= 2.62,
   ]
 )
 
-# the old threading system 
-PKG_CHECK_MODULES(GTHREAD, gthread-2.0)
-PACKAGES_USED="$PACKAGES_USED gthread-2.0"
-
-# from 2.32 there are a new set of thread functions, annoyingly
+# from 2.32 there are a new set of thread functions, it is no longer
+# necessary to use g_thread_init() or to link against libgthread
 PKG_CHECK_MODULES(THREADS, glib-2.0 >= 2.32,
   [AC_DEFINE(HAVE_MUTEX_INIT,1,[define if your glib has g_mutex_init().])
    AC_DEFINE(HAVE_COND_INIT,1,[define if your glib has g_cond_init().])
@@ -519,7 +485,8 @@ PKG_CHECK_MODULES(THREADS, glib-2.0 >= 2.32,
 	     [define if your glib has g_value_get_schar().]
    )
   ],
-  [:
+  [PKG_CHECK_MODULES(GTHREAD, gthread-2.0)
+   PACKAGES_USED="$PACKAGES_USED gthread-2.0"
   ]
 )
 
@@ -575,9 +542,16 @@ PKG_CHECK_MODULES(HAVE_CHECKED_MUL, glib-2.0 >= 2.48,
 # check for gtk-doc
 GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
 
-# we need expat ... we'd love to use expat.pc, but sadly this is only available
-# for recent linuxes, so we have to use the old and horrible expat.m4
-AM_WITH_EXPAT
+# we need expat ... the .pc file for expat is only available
+# for recent linuxes, so we fall back to AM_WITH_EXPAT
+PKG_CHECK_MODULES(EXPAT, expat,
+  [expat_found=yes
+   PACKAGES_USED="$PACKAGES_USED expat"
+  ],
+  [AM_WITH_EXPAT
+  ]
+)
+
 if test x"$expat_found" = x"no"; then
   exit 1
 fi
@@ -1323,17 +1297,11 @@ if test x"$LIB_FUZZING_ENGINE" = x; then
   LIB_FUZZING_ENGINE="libstandaloneengine.a"
 fi
 
-# Gather all up for VIPS_CFLAGS, VIPS_INCLUDES, VIPS_LIBS 
-# sort includes to get longer, more specific dirs first
-# helps, for example, selecting graphicsmagick over imagemagick
-VIPS_CFLAGS=`for i in $VIPS_CFLAGS $GTHREAD_CFLAGS $REQUIRED_CFLAGS $EXPAT_CFLAGS $ZLIB_CFLAGS $PANGOFT2_CFLAGS $GSF_CFLAGS $FFTW_CFLAGS $MAGICK_CFLAGS $JPEG_CFLAGS $PNG_CFLAGS $IMAGEQUANT_CFLAGS $EXIF_CFLAGS $MATIO_CFLAGS $CFITSIO_CFLAGS $LIBWEBP_CFLAGS $LIBWEBPMUX_CFLAGS $GIFLIB_INCLUDES $RSVG_CFLAGS $PDFIUM_INCLUDES $POPPLER_CFLAGS $OPENEXR_CFLAGS $OPENSLIDE_CFLAGS $ORC_CFLAGS $TIFF_CFLAGS $LCMS_CFLAGS $HEIF_CFLAGS
-do 
-	echo $i 
-done | sort -ru`
-VIPS_CFLAGS=`echo $VIPS_CFLAGS`
+# Gather all up for VIPS_CFLAGS, VIPS_INCLUDES, VIPS_LIBS
+VIPS_CFLAGS="$VIPS_CFLAGS $GTHREAD_CFLAGS $GIO_CFLAGS $REQUIRED_CFLAGS $EXPAT_CFLAGS $ZLIB_CFLAGS $PANGOFT2_CFLAGS $GSF_CFLAGS $FFTW_CFLAGS $MAGICK_CFLAGS $JPEG_CFLAGS $PNG_CFLAGS $IMAGEQUANT_CFLAGS $EXIF_CFLAGS $MATIO_CFLAGS $CFITSIO_CFLAGS $LIBWEBP_CFLAGS $LIBWEBPMUX_CFLAGS $GIFLIB_INCLUDES $RSVG_CFLAGS $PDFIUM_INCLUDES $POPPLER_CFLAGS $OPENEXR_CFLAGS $OPENSLIDE_CFLAGS $ORC_CFLAGS $TIFF_CFLAGS $LCMS_CFLAGS $HEIF_CFLAGS"
 VIPS_CFLAGS="$VIPS_DEBUG_FLAGS $VIPS_CFLAGS"
 VIPS_INCLUDES="$ZLIB_INCLUDES $PNG_INCLUDES $TIFF_INCLUDES $JPEG_INCLUDES $NIFTI_INCLUDES" 
-VIPS_LIBS="$ZLIB_LIBS $HEIF_LIBS $MAGICK_LIBS $PNG_LIBS $IMAGEQUANT_LIBS $TIFF_LIBS $JPEG_LIBS $GTHREAD_LIBS $REQUIRED_LIBS $EXPAT_LIBS $PANGOFT2_LIBS $GSF_LIBS $FFTW_LIBS $ORC_LIBS $LCMS_LIBS $GIFLIB_LIBS $RSVG_LIBS $NIFTI_LIBS $PDFIUM_LIBS $POPPLER_LIBS $OPENEXR_LIBS $OPENSLIDE_LIBS $CFITSIO_LIBS $LIBWEBP_LIBS $LIBWEBPMUX_LIBS $MATIO_LIBS $EXIF_LIBS -lm"
+VIPS_LIBS="$ZLIB_LIBS $HEIF_LIBS $MAGICK_LIBS $PNG_LIBS $IMAGEQUANT_LIBS $TIFF_LIBS $JPEG_LIBS $GTHREAD_LIBS $GIO_LIBS $REQUIRED_LIBS $EXPAT_LIBS $PANGOFT2_LIBS $GSF_LIBS $FFTW_LIBS $ORC_LIBS $LCMS_LIBS $GIFLIB_LIBS $RSVG_LIBS $NIFTI_LIBS $PDFIUM_LIBS $POPPLER_LIBS $OPENEXR_LIBS $OPENSLIDE_LIBS $CFITSIO_LIBS $LIBWEBP_LIBS $LIBWEBPMUX_LIBS $MATIO_LIBS $EXIF_LIBS -lm"
 
 AC_SUBST(VIPS_LIBDIR)
 

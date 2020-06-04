@@ -1,6 +1,7 @@
 noinst_LTLIBRARIES = libiofuncs.la
 
 libiofuncs_la_SOURCES = \
+	ginputsource.c \
 	connection.c \
 	source.c \
 	sourcecustom.c \
@@ -15,7 +16,6 @@ libiofuncs_la_SOURCES = \
 	gate.c \
 	enumtypes.c \
 	object.c \
-	base64.c \
 	error.c \
 	image.c \
 	vips.c \

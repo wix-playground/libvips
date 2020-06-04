@@ -336,6 +336,7 @@ vips_init( const char *argv0 )
 	extern GType vips_source_custom_get_type( void ); 
 	extern GType vips_target_get_type( void ); 
 	extern GType vips_target_custom_get_type( void ); 
+	extern GType vips_g_input_stream_get_type( void ); 
 
 	static gboolean started = FALSE;
 	static gboolean done = FALSE;
@@ -383,6 +384,7 @@ vips_init( const char *argv0 )
 #endif /*HAVE_THREAD_NEW*/
 
 	vips__threadpool_init();
+	vips__sink_screen_init();
 	vips__buffer_init();
 	vips__meta_init();
 
@@ -390,7 +392,9 @@ vips_init( const char *argv0 )
 	 * we have to make sure we do this single-threaded. See: 
 	 * https://github.com/openslide/openslide/issues/161
 	 */
+#if !GLIB_CHECK_VERSION( 2, 48, 1 )
 	(void) g_get_language_names(); 
+#endif
 
 	if( !vips__global_lock )
 		vips__global_lock = vips_g_mutex_new();
@@ -483,6 +487,7 @@ vips_init( const char *argv0 )
 	vips_morphology_operation_init();
 	vips_draw_operation_init();
 	vips_mosaicing_operation_init();
+	vips_g_input_stream_get_type(); 
 
 	/* Load any vips8 plugins from the vips libdir. Keep going, even if
 	 * some plugins fail to load. 
