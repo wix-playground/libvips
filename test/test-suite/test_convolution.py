@@ -1,11 +1,12 @@
 # vim: set fileencoding=utf-8 :
+import os
 import operator
 import pytest
 from functools import reduce
 
 import pyvips
 from helpers import noncomplex_formats, run_fn2, run_fn, \
-    assert_almost_equal_objects, assert_less_threshold
+    assert_almost_equal_objects, assert_less_threshold, PNG_FILE, LOGO2_PNG_FILE, LOGO3_PNG_FILE, IMAGES
 
 
 # point convolution
@@ -189,6 +190,62 @@ class TestConvolution:
 
                     assert_almost_equal_objects(a_point, b_point,
                                                 threshold=0.1)
+
+    def test_sharpen_rgb_no_alpha(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb.png' % PNG_FILE)
+
+    def test_sharpen_rgb_no_alpha__small_sigma(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=0.5, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb-small-sigma.png' % PNG_FILE)
+
+    def test_sharpen_rgb_no_alpha__unity_kernel(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=0.000001, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb-unity-kernel.png' % PNG_FILE)
+
+    def test_sharpen_rgb_with_alpha(self):
+        im = pyvips.Image.new_from_file(LOGO2_PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb.png' % LOGO2_PNG_FILE)
+
+    def test_sharpen_rgb_logo3(self):
+        im = pyvips.Image.new_from_file(LOGO3_PNG_FILE)
+        sharp = im.sharpen(mode='rgb', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-rgb.png' % LOGO3_PNG_FILE)
+
+    def test_sharpen_luminescence_no_alpha(self):
+        im = pyvips.Image.new_from_file(PNG_FILE)
+        sharp = im.sharpen(mode='luminescence', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-l.png' % PNG_FILE)
+
+    def test_sharpen_luminescence_with_alpha(self):
+        im = pyvips.Image.new_from_file(LOGO2_PNG_FILE)
+        sharp = im.sharpen(mode='luminescence', sigma=1 + 0.66 / 2, m2=1.0, x1=1.0)
+        sharp.write_to_file('%s.sharpened-l.png' % LOGO2_PNG_FILE)
+
+    def test_sharpen_resized_lanczos3(self):
+        filename = IMAGES + '/logo3.png.resized-lanczos.png'
+        im = pyvips.Image.new_from_file(filename)
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s.sharpened-rgb.png' % filename)
+
+    def _test_sharpen_rgb_visual_tests(self):
+        for filename in ['logo3.png.resized-lanczos.png',
+                         'logo3-resized-by-magick.png',
+                         'logo3-scaled-by-gimp-interpolation-nohalo.png',
+                         'logo3-scaled-by-gimp-interpolation-none.png',
+                         'png-24bit-alphat-logo-eltaquito.png',
+                         'png-24bit-alphat-logo-olhos.png',
+                         'png-24bit-alphat-logo-zetta.png',
+                         'jpg-24bit-world-leaders.jpg',
+                         'jpg-8bit-grey-icc-dot-gain.jpg']:
+            path = os.path.join(IMAGES, filename)
+            im = pyvips.Image.new_from_file(path)
+            sharp = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+            sharp.write_to_file('%s.sharpened-rgb.png' % path)
 
     def test_sharpen(self):
         for im in self.all_images:

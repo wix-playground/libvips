@@ -437,6 +437,23 @@ vips_combine_get_type( void )
 
 	return( etype );
 }
+GType
+vips_sharpen_mode_get_type( void )
+{
+	static GType etype = 0;
+
+	if( etype == 0 ) {
+		static const GEnumValue values[] = {
+			{VIPS_SHARPEN_MODE_LUMINESCENCE, "VIPS_SHARPEN_MODE_LUMINESCENCE", "luminescence"},
+			{VIPS_SHARPEN_MODE_RGB, "VIPS_SHARPEN_MODE_RGB", "rgb"},
+			{0, NULL, NULL}
+		};
+		
+		etype = g_enum_register_static( "VipsSharpenMode", values );
+	}
+
+	return( etype );
+}
 /* enumerations from "../../libvips/include/vips/draw.h" */
 GType
 vips_combine_mode_get_type( void )
@@ -949,6 +966,7 @@ vips_kernel_get_type( void )
 			{VIPS_KERNEL_MITCHELL, "VIPS_KERNEL_MITCHELL", "mitchell"},
 			{VIPS_KERNEL_LANCZOS2, "VIPS_KERNEL_LANCZOS2", "lanczos2"},
 			{VIPS_KERNEL_LANCZOS3, "VIPS_KERNEL_LANCZOS3", "lanczos3"},
+			{VIPS_KERNEL_APPROX_LANCZOS3, "VIPS_KERNEL_APPROX_LANCZOS3", "approx-lanczos3"},
 			{VIPS_KERNEL_LAST, "VIPS_KERNEL_LAST", "last"},
 			{0, NULL, NULL}
 		};

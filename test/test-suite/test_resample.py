@@ -1,8 +1,11 @@
 # vim: set fileencoding=utf-8 :
+import math
+import os
+
 import pytest
 
 import pyvips
-from helpers import JPEG_FILE, HEIC_FILE, all_formats, have
+from helpers import JPEG_FILE, HEIC_FILE, all_formats, have, LOGO3_PNG_FILE, IMAGES
 
 
 # Run a function expecting a complex image on a two-band image
@@ -74,6 +77,44 @@ class TestResample:
 
             assert (x - im).abs().max() == 0
 
+    def test_affine_nohalo(self):
+        im = pyvips.Image.new_from_file(LOGO3_PNG_FILE)
+        new_width = 328.0
+        new_height = 98.0
+
+        in_width = im.width
+        factor = in_width / new_width
+        shrink = math.floor(factor)
+        if shrink < 1:
+            shrink = 1
+
+        residual = shrink / factor
+        print('factor=%s' % factor)
+        print('shrink=%s' % shrink)
+        print('residual=%s' % residual)
+
+        if shrink > 1:
+            print('shrinking')
+            im = im.shrink(shrink, shrink)
+
+            shrunk_width = int(im.width)
+            shrunk_height = int(im.height)
+
+            residualx = new_width / shrunk_width
+            residualy = new_height / shrunk_height
+
+            residual = min(residualx, residualy)
+        print('after shrink residual=%s' % residual)
+
+        for interp in ["nearest", "bicubic", "bilinear", "nohalo", "lbb"]:
+            if residual:
+                interpolate = pyvips.Interpolate.new(interp)
+                im = im.affine([residual, 0, 0, residual], interpolate=interpolate)
+                im.write_to_file('%s-affined-%s.png' % (LOGO3_PNG_FILE, interp))
+
+            sharp = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+            sharp.write_to_file('%s-affined-%s-sharpened-rgb.png' % (LOGO3_PNG_FILE, interp))
+
     def test_reduce(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)
         # cast down to 0-127, the smallest range, so we aren't messed up by
@@ -113,6 +154,89 @@ class TestResample:
         x = im.resize(0.5)
         assert x.width == 50
         assert x.height == 1
+
+    def test_resize_logo3__lanczos3(self):
+        # 2382x711 -> 328x711
+        # 13.77%x100%
+        # self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0, 711.0)
+        self.resize_and_sharpen(IMAGES + '/logo3.png', 328.0)
+
+    def test_resize_and_sharpen_zetta(self):
+        self.resize_and_sharpen(IMAGES + '/zetta.png', 436.0)
+
+    def test_sharpen_resized_by_magick_olhos(self):
+        # 828 × 322 -> 402 x 156
+        self.sharpen(IMAGES + '/olhos-resized-by-magick.png')
+
+    def test_resize_and_sharpen_world_leaders(self):
+        # w_640,h_416
+        self.resize_and_sharpen(IMAGES + '/world-leaders.jpg', 640.0, 416.0)
+
+    def test_resize_and_sharpen_olhos(self):
+        # 828 × 322 -> 402 x 156
+        self.resize_and_sharpen(IMAGES + '/olhos.png', 402.0, 156.0)
+
+    def test_resize_and_sharpen_olhos__only_horizontal(self):
+        # 828 × 322 -> 402 x 322
+        self.resize_and_sharpen(IMAGES + '/olhos-h.png', 402.0, 322.0)
+
+    def test_resize_and_sharpen_olhos__only_vertical(self):
+        # 828 × 322 -> 828 × 156
+        self.resize_and_sharpen(IMAGES + '/olhos-v.png', 828.0, 156.0)
+
+    def test_resize_and_sharpen_40x40(self):
+        # 828 × 322 -> 402 x 156
+        self.resize_and_sharpen(IMAGES + '/40x40.png', 39.0)
+
+    def test_resize_and_sharpen_40x40__only_horizontal(self):
+        # 828 × 322 -> 402 x 322
+        self.resize_and_sharpen(IMAGES + '/40x40-h.png', 39.0, 40.0)
+
+    def test_resize_and_sharpen_40x40__only_vertical(self):
+        # 828 × 322 -> 828 × 156
+        self.resize_and_sharpen(IMAGES + '/40x40-v.png', 40.0, 39.0)
+
+    def test_resize_and_sharpen_tiny(self):
+        self.resize_and_sharpen(IMAGES + '/4x4.png', 3.0)
+
+    def test_resize_and_sharpen_two_strip(self):
+        self.resize_and_sharpen(IMAGES + '/two-strip.png', 16.0)
+
+    def test_resize_and_sharpen_1024_to_16(self):
+        for i in range(1):
+            print('----- Iteration %s' % i)
+            self.resize_and_sharpen(IMAGES + '/1024x1024.png', 16.0)
+
+    @staticmethod
+    def resize_and_sharpen(filename, new_width, new_height=None):
+        _, ext = os.path.splitext(filename)
+        im = pyvips.Image.new_from_file(filename)
+        new_height = new_height or im.height * new_width / im.width
+        print('new height %s' % new_height)
+        # im = im.colourspace('rgb16')
+
+        print('new_width / im.width=', new_width / im.width)
+        im = im.alpha_resize(new_width / im.width, vscale=new_height / im.height)
+
+        print('Writing resized')
+        im.write_to_file('%s.resized-lanczos%s' % (filename, ext))
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s.resized-lanczos-sharpened%s' % (filename, ext))
+
+    @staticmethod
+    def sharpen(filename):
+        im = pyvips.Image.new_from_file(filename)
+        im = im.colourspace('rgb16')
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s-sharpened.png' % filename)
+
+    def test_thumbnail_logo3(self):
+        filename = IMAGES + '/logo3.png'
+        im = pyvips.Image.new_from_file(filename)
+        im = im.thumbnail_image(328, linear=True)
+        im.write_to_file('%s.thumbnail-linear.png' % filename)
+        im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
+        im.write_to_file('%s.thumbnail-linear-sharpened.png' % filename)
 
     def test_shrink(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)
