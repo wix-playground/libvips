@@ -232,7 +232,7 @@ class TestConvolution:
         im = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
         im.write_to_file('%s.sharpened-rgb.png' % filename)
 
-    def test_sharpen_rgb_visual_tests(self):
+    def _test_sharpen_rgb_visual_tests(self):
         for filename in ['logo3.png.resized-lanczos.png',
                          'logo3-resized-by-magick.png',
                          'logo3-scaled-by-gimp-interpolation-nohalo.png',
