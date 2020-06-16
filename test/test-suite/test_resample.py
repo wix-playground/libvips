@@ -5,7 +5,7 @@ import os
 import pytest
 
 import pyvips
-from helpers import JPEG_FILE, HEIC_FILE, all_formats, have, LOGO3_PNG_FILE, IMAGES
+from helpers import JPEG_FILE, OME_FILE ,HEIC_FILE, all_formats, have, LOGO3_PNG_FILE, IMAGES
 
 
 # Run a function expecting a complex image on a two-band image
@@ -76,44 +76,6 @@ class TestResample:
                 x = x.affine([0, 1, 1, 0], interpolate=interpolate)
 
             assert (x - im).abs().max() == 0
-
-    def test_affine_nohalo(self):
-        im = pyvips.Image.new_from_file(LOGO3_PNG_FILE)
-        new_width = 328.0
-        new_height = 98.0
-
-        in_width = im.width
-        factor = in_width / new_width
-        shrink = math.floor(factor)
-        if shrink < 1:
-            shrink = 1
-
-        residual = shrink / factor
-        print('factor=%s' % factor)
-        print('shrink=%s' % shrink)
-        print('residual=%s' % residual)
-
-        if shrink > 1:
-            print('shrinking')
-            im = im.shrink(shrink, shrink)
-
-            shrunk_width = int(im.width)
-            shrunk_height = int(im.height)
-
-            residualx = new_width / shrunk_width
-            residualy = new_height / shrunk_height
-
-            residual = min(residualx, residualy)
-        print('after shrink residual=%s' % residual)
-
-        for interp in ["nearest", "bicubic", "bilinear", "nohalo", "lbb"]:
-            if residual:
-                interpolate = pyvips.Interpolate.new(interp)
-                im = im.affine([residual, 0, 0, residual], interpolate=interpolate)
-                im.write_to_file('%s-affined-%s.png' % (LOGO3_PNG_FILE, interp))
-
-            sharp = im.sharpen(mode='rgb', sigma=0.66, m2=1.0, x1=1.0)
-            sharp.write_to_file('%s-affined-%s-sharpened-rgb.png' % (LOGO3_PNG_FILE, interp))
 
     def test_reduce(self):
         im = pyvips.Image.new_from_file(JPEG_FILE)
@@ -289,6 +251,26 @@ class TestResample:
             buf = f.read()
         im2 = pyvips.Image.thumbnail_buffer(buf, 100)
         assert abs(im1.avg() - im2.avg()) < 1
+
+        # should be able to thumbnail many-page tiff
+        im = pyvips.Image.thumbnail(OME_FILE, 100)
+        assert im.width == 100
+        assert im.height == 38
+
+        # should be able to thumbnail individual pages from many-page tiff
+        im1 = pyvips.Image.thumbnail(f"{OME_FILE}[page=0]", 100)
+        assert im1.width == 100
+        assert im1.height == 38
+        im2 = pyvips.Image.thumbnail(f"{OME_FILE}[page=1]", 100)
+        assert im2.width == 100
+        assert im2.height == 38
+        assert (im1 - im2).abs().max() != 0
+
+        # should be able to thumbnail entire many-page tiff as a toilet-roll
+        # image
+        im = pyvips.Image.thumbnail(f"{OME_FILE}[n=-1]", 100)
+        assert im.width == 100
+        assert im.height == 570
 
         if have("heifload"):
             # this image is orientation 6 ... thumbnail should flip it
