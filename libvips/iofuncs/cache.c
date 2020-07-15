@@ -78,7 +78,7 @@ gboolean vips__cache_trace = FALSE;
  * It was 10,000, but this was too high for batch-style applications with
  * little reuse. 
  */
-static int vips_cache_max = 1000;
+static int vips_cache_max = 100;
 
 /* How many tracked open files we allow before we start dropping cache.
  */
@@ -453,7 +453,7 @@ vips_operation_equal( VipsOperation *a, VipsOperation *b )
 }
 
 void *
-vips__cache_once_init( void )
+vips__cache_once_init( void *data )
 {
 	vips_cache_lock = vips_g_mutex_new();
 
@@ -469,7 +469,7 @@ vips__cache_init( void )
 {
 	static GOnce once = G_ONCE_INIT;
 
-	VIPS_ONCE( &once, (GThreadFunc) vips__cache_once_init, NULL );
+	VIPS_ONCE( &once, vips__cache_once_init, NULL );
 }
 
 static void *

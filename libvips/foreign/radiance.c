@@ -739,13 +739,13 @@ vips__rad_israd( VipsSource *source )
 }
 
 static void
-read_destroy( VipsObject *object, Read *read )
+read_destroy( VipsImage *image, Read *read )
 {
 	VIPS_UNREF( read->sbuf );
 }
 
 static void
-read_minimise_cb( VipsObject *object, Read *read )
+read_minimise_cb( VipsImage *image, Read *read )
 {
 	if( read->sbuf )
 		vips_source_minimise( read->sbuf->source );
@@ -994,7 +994,7 @@ write_destroy( Write *write )
 	VIPS_FREE( write->line );
 	VIPS_UNREF( write->target );
 
-	vips_free( write );
+	g_free( write );
 }
 
 static Write *
@@ -1168,7 +1168,7 @@ vips__rad_save( VipsImage *in, VipsTarget *target )
 #endif /*DEBUG*/
 
 	if( vips_image_pio_input( in ) ||
-		vips_check_coding_rad( "vips2rad", in ) )
+		vips_check_coding( "vips2rad", in, VIPS_CODING_RAD ) )
 		return( -1 );
 	if( !(write = write_new( in, target )) ) 
 		return( -1 );

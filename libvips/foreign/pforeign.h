@@ -53,7 +53,7 @@ int vips__tiff_write( VipsImage *in, const char *filename,
 	char *profile,
 	gboolean tile, int tile_width, int tile_height,
 	gboolean pyramid,
-	gboolean squash,
+	int bitdepth,
 	gboolean miniswhite,
 	VipsForeignTiffResunit resunit, double xres, double yres,
 	gboolean bigtiff,
@@ -73,7 +73,7 @@ int vips__tiff_write_buf( VipsImage *in,
 	char *profile,
 	gboolean tile, int tile_width, int tile_height,
 	gboolean pyramid,
-	gboolean squash,
+	int bitdepth,
 	gboolean miniswhite,
 	VipsForeignTiffResunit resunit, double xres, double yres,
 	gboolean bigtiff,
@@ -184,7 +184,8 @@ extern const char *vips__png_suffs[];
 int vips__png_write_target( VipsImage *in, VipsTarget *target,
 	int compress, int interlace, const char *profile,
 	VipsForeignPngFilter filter, gboolean strip,
-	gboolean palette, int colours, int Q, double dither );
+	gboolean palette, int Q, double dither,
+	int bitdepth );
 
 /* Map WEBP metadata names to vips names.
  */

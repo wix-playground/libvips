@@ -199,6 +199,8 @@
  * 	- better handling of aligned reads in multipage tiffs
  * 28/5/20
  * 	- add subifd
+ * 6/6/20 MathemanFlo
+ * 	- support 2 and 4 bit greyscale load
  */
 
 /*
@@ -265,6 +267,7 @@ typedef struct _RtiffHeader {
 	int sample_format;
 	gboolean separate; 
 	int orientation; 
+
 	/* If there's a premultiplied alpha, the band we need to 
 	 * unpremultiply with. -1 for no unpremultiplication.
 	 */
@@ -519,7 +522,7 @@ rtiff_free( Rtiff *rtiff )
 }
 
 static void
-rtiff_close_cb( VipsObject *object, Rtiff *rtiff )
+rtiff_close_cb( VipsImage *image, Rtiff *rtiff )
 {
 	rtiff_free( rtiff ); 
 }
@@ -602,7 +605,7 @@ rtiff_strip_read( Rtiff *rtiff, int strip, tdata_t buf )
 
 	if( rtiff->header.read_scanlinewise )  
 		length = TIFFReadScanline( rtiff->tiff, 
-			buf, strip, (tsize_t) -1 );
+			buf, strip, (tsample_t) 0 );
 	else 
 		length = TIFFReadEncodedStrip( rtiff->tiff, 
 			strip, buf, (tsize_t) -1 );
@@ -614,6 +617,25 @@ rtiff_strip_read( Rtiff *rtiff, int strip, tdata_t buf )
 	}
 
 	return( 0 );
+}
+
+/* We need to hint to libtiff what format we'd like pixels in.
+ */
+static void
+rtiff_set_decode_format( Rtiff *rtiff )
+{
+	/* Ask for YCbCr->RGB for jpg data.
+	 */
+	if( rtiff->header.compression == COMPRESSION_JPEG )
+		TIFFSetField( rtiff->tiff, 
+			TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB );
+
+	/* Ask for SGI LOGLUV as 3xfloat.
+	 */
+	if( rtiff->header.photometric_interpretation == 
+		PHOTOMETRIC_LOGLUV ) 
+		TIFFSetField( rtiff->tiff, 
+			TIFFTAG_SGILOGDATAFMT, SGILOGDATAFMT_FLOAT );
 }
 
 static int
@@ -662,12 +684,10 @@ rtiff_set_page( Rtiff *rtiff, int page )
 
 		rtiff->current_page = page;
 
-		/* This can get unset when we change directories. Make sure
-		 * it's set again.
+		/* These can get unset when we change directories. Make sure
+		 * they are set again.
 		 */
-		if( rtiff->header.compression == COMPRESSION_JPEG )
-			TIFFSetField( rtiff->tiff, 
-				TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB );
+		rtiff_set_decode_format( rtiff );
 	}
 
 	return( 0 );
@@ -1017,44 +1037,61 @@ rtiff_parse_logluv( Rtiff *rtiff, VipsImage *out )
 	return( 0 );
 }
 
-/* Per-scanline process function for 1 bit images.
+/* Make a N-bit scanline process function. We pass in the code to expand the
+ * bits down the byte since this does not generalize well.
  */
-static void
-rtiff_onebit_line( Rtiff *rtiff, VipsPel *q, VipsPel *p, int n, void *flg )
-{
-	int photometric_interpretation = 
-		rtiff->header.photometric_interpretation;
-
-	int x, i, z;
-	VipsPel bits;
-
-	int black = photometric_interpretation == PHOTOMETRIC_MINISBLACK ?
-		0 : 255;
-	int white = black ^ 0xff;
-
-	/* (sigh) how many times have I written this?
-	 */
-	x = 0; 
-	for( i = 0; i < (n >> 3); i++ ) {
-		bits = (VipsPel) p[i];
-
-		for( z = 0; z < 8; z++ ) {
-			q[x] = (bits & 128) ? white : black;
-			bits <<= 1;
-			x += 1;
-		}
-	}
-
-	/* Do last byte in line.
-	 */
-	if( n & 7 ) {
-		bits = p[i];
-		for( z = 0; z < (n & 7); z++ ) {
-			q[x + z] = (bits & 128) ? white : black;
-			bits <<= 1;
-		}
-	}
+#define NBIT_LINE( N, EXPAND ) \
+static void \
+rtiff_ ## N ## bit_line( Rtiff *rtiff, \
+	VipsPel *q, VipsPel *p, int n, void *flg ) \
+{ \
+	int photometric = rtiff->header.photometric_interpretation; \
+	int mask = photometric == PHOTOMETRIC_MINISBLACK ?  0 : 0xff; \
+	int bps = rtiff->header.bits_per_sample; \
+	int load = 8 / bps - 1; \
+	\
+	int x; \
+	VipsPel bits; \
+	\
+	/* Stop a compiler warning. \
+	 */ \
+	bits = 0; \
+	\
+	for( x = 0; x < n; x++ ) { \
+		if( (x & load) == 0 ) \
+			/* Flip the bits for miniswhite. \
+			 */ \
+			bits = *p++ ^ mask; \
+	 	\
+		EXPAND( q[x], bits ); \
+		\
+		bits <<= bps; \
+	} \
 }
+
+/* Expand the top bit down a byte. Use a sign-extending shift.
+ */
+#define EXPAND1( Q, BITS ) G_STMT_START { \
+	(Q) = (((signed char) (BITS & 128)) >> 7); \
+} G_STMT_END
+
+/* Expand the top two bits down a byte. Shift down, then expand up.
+ */
+#define EXPAND2( Q, BITS ) G_STMT_START { \
+	VipsPel twobits = BITS >> 6; \
+	VipsPel fourbits = twobits | (twobits << 2); \
+	Q = fourbits | (fourbits << 4); \
+} G_STMT_END
+
+/* Expand the top four bits down a byte. 
+ */
+#define EXPAND4( Q, BITS ) G_STMT_START { \
+	Q = (BITS & 0xf0) | (BITS >> 4); \
+} G_STMT_END
+
+NBIT_LINE( 1, EXPAND1 )
+NBIT_LINE( 2, EXPAND2 )
+NBIT_LINE( 4, EXPAND4 )
 
 /* Read a 1-bit TIFF image. 
  */
@@ -1070,7 +1107,45 @@ rtiff_parse_onebit( Rtiff *rtiff, VipsImage *out )
 	out->Coding = VIPS_CODING_NONE; 
 	out->Type = VIPS_INTERPRETATION_B_W; 
 
-	rtiff->sfn = rtiff_onebit_line;
+	rtiff->sfn = rtiff_1bit_line;
+
+	return( 0 );
+}
+
+/* Read a 2-bit TIFF image. 
+ */
+static int
+rtiff_parse_twobit( Rtiff *rtiff, VipsImage *out )
+{
+	if( rtiff_check_samples( rtiff, 1 ) ||
+		rtiff_check_bits( rtiff, 2 ) )
+		return( -1 );
+
+	out->Bands = 1; 
+	out->BandFmt = VIPS_FORMAT_UCHAR; 
+	out->Coding = VIPS_CODING_NONE; 
+	out->Type = VIPS_INTERPRETATION_B_W; 
+
+	rtiff->sfn = rtiff_2bit_line;
+
+	return( 0 );
+}
+
+/* Read a 4-bit TIFF image. 
+ */
+static int
+rtiff_parse_fourbit( Rtiff *rtiff, VipsImage *out )
+{
+	if( rtiff_check_samples( rtiff, 1 ) ||
+		rtiff_check_bits( rtiff, 4 ) )
+		return( -1 );
+
+	out->Bands = 1; 
+	out->BandFmt = VIPS_FORMAT_UCHAR; 
+	out->Coding = VIPS_CODING_NONE; 
+	out->Type = VIPS_INTERPRETATION_B_W; 
+
+	rtiff->sfn = rtiff_4bit_line;
 
 	return( 0 );
 }
@@ -1517,8 +1592,13 @@ rtiff_pick_reader( Rtiff *rtiff )
 
 	if( photometric_interpretation == PHOTOMETRIC_MINISWHITE ||
 		photometric_interpretation == PHOTOMETRIC_MINISBLACK ) {
-		if( bits_per_sample == 1 )
-			return( rtiff_parse_onebit ); 
+
+		if( bits_per_sample == 1)
+			return ( rtiff_parse_onebit );
+		else if ( bits_per_sample == 2 )
+			return ( rtiff_parse_twobit);
+		else if ( bits_per_sample == 4 )
+			return ( rtiff_parse_fourbit);
 		else
 			return( rtiff_parse_greyscale ); 
 	}
@@ -1538,21 +1618,10 @@ rtiff_set_header( Rtiff *rtiff, VipsImage *out )
 	uint32 data_length;
 	void *data;
 
-	/* Request YCbCr expansion. libtiff complains if you do this for
-	 * non-jpg images.
-	 */
-	if( rtiff->header.compression == COMPRESSION_JPEG )
-		TIFFSetField( rtiff->tiff, 
-			TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB );
+	rtiff_set_decode_format( rtiff );
 
-	/* Ask for LOGLUV as 3 x float XYZ. 
-	 */
-	if( rtiff->header.photometric_interpretation == PHOTOMETRIC_LOGLUV ) {
-		TIFFSetField( rtiff->tiff, 
-			TIFFTAG_SGILOGDATAFMT, SGILOGDATAFMT_FLOAT );
-
+	if( rtiff->header.photometric_interpretation == PHOTOMETRIC_LOGLUV )
 		vips_image_set_double( out, "stonits", rtiff->header.stonits );
-	}
 
 	out->Xsize = rtiff->header.width;
 	out->Ysize = rtiff->header.height * rtiff->n;
@@ -1857,7 +1926,7 @@ rtiff_fill_region( VipsRegion *out,
 static int
 rtiff_seq_stop( void *seq, void *a, void *b )
 {
-	vips_free( seq );
+	g_free( seq );
 
 	return( 0 );
 }
@@ -2308,14 +2377,16 @@ rtiff_header_read( Rtiff *rtiff, RtiffHeader *header )
 	TIFFGetFieldDefaulted( rtiff->tiff, 
 		TIFFTAG_COMPRESSION, &header->compression );
 
+	/* We must set this here since it'll change the value of scanline_size.
+	 */
+	rtiff_set_decode_format( rtiff );
+
 	/* Request YCbCr expansion. libtiff complains if you do this for
 	 * non-jpg images. We must set this here since it changes the result
 	 * of scanline_size.
 	 */
-	if( header->compression == COMPRESSION_JPEG )
-		TIFFSetField( rtiff->tiff, 
-			TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB );
-	else if( header->photometric_interpretation == PHOTOMETRIC_YCBCR ) {
+	if( header->compression != COMPRESSION_JPEG &&
+		header->photometric_interpretation == PHOTOMETRIC_YCBCR ) {
 		/* We rely on the jpg decompressor to upsample chroma
 		 * subsampled images. If there is chroma subsampling but
 		 * no jpg compression, we have to give up.
@@ -2341,12 +2412,6 @@ rtiff_header_read( Rtiff *rtiff, RtiffHeader *header )
 				"%s", _( "not SGI-compressed LOGLUV" ) );
 			return( -1 );
 		}
-
-		/* Always get LOGLUV as 3 x float XYZ. We must set this here 
-		 * since it'll change the value of scanline_size.
-		 */
-		TIFFSetField( rtiff->tiff, 
-			TIFFTAG_SGILOGDATAFMT, SGILOGDATAFMT_FLOAT );
 	}
 
 	/* For logluv, the calibration factor to get to absolute luminance.

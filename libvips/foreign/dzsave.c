@@ -218,13 +218,22 @@ typedef struct _VipsGsfDirectory {
 
 } VipsGsfDirectory; 
 
+static void *vips_gsf_tree_close( VipsGsfDirectory *tree );
+
+static void *
+vips_gsf_tree_close_cb( void *item, void *a, void *b )
+{
+	VipsGsfDirectory *tree = (VipsGsfDirectory *) item;
+
+	return( vips_gsf_tree_close( tree ) );
+}
+
 /* Close all dirs, non-NULL on error.
  */
 static void *
 vips_gsf_tree_close( VipsGsfDirectory *tree )
 {
-	vips_slist_map2( tree->children, 
-		(VipsSListMap2Fn) vips_gsf_tree_close, NULL, NULL );
+	vips_slist_map2( tree->children, vips_gsf_tree_close_cb, NULL, NULL );
 
 	if( tree->out ) {
 		if( !gsf_output_is_closed( tree->out ) &&
@@ -275,7 +284,7 @@ vips_gsf_tree_new( GsfOutput *out, gint deflate_level )
 }
 
 static void *
-vips_gsf_child_by_name_sub( VipsGsfDirectory *dir, const char *name )
+vips_gsf_child_by_name_sub( VipsGsfDirectory *dir, const char *name, void *b )
 {
 	if( strcmp( dir->name, name ) == 0 )
 		return( dir );
@@ -2692,7 +2701,7 @@ vips_foreign_save_dz_buffer_build( VipsObject *object )
 		gsf_output_memory_get_bytes( GSF_OUTPUT_MEMORY( dz->out ) ),
 		olen ); 
 
-	blob = vips_blob_new( (VipsCallbackFn) g_free, obuf, olen );
+	blob = vips_blob_new( (VipsCallbackFn) vips_area_free_cb, obuf, olen );
 	g_object_set( object, "buffer", blob, NULL );
 	vips_area_unref( VIPS_AREA( blob ) );
 

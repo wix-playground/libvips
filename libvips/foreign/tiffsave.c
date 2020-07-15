@@ -23,6 +23,9 @@
  * 	- add "depth" to set pyr depth
  * 12/5/20
  * 	- add "subifd" to create pyr layers as sub-directories
+ * 8/6/20
+ * 	- add bitdepth support for 2 and 4 bit greyscale images
+ * 	- deprecate "squash"
  */
 
 /*
@@ -89,6 +92,7 @@ typedef struct _VipsForeignSaveTiff {
 	int tile_height;
 	gboolean pyramid;
 	gboolean squash;
+	int bitdepth;
 	gboolean miniswhite;
 	VipsForeignTiffResunit resunit;
 	double xres;
@@ -260,13 +264,6 @@ vips_foreign_save_tiff_class_init( VipsForeignSaveTiffClass *class )
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, pyramid ),
 		FALSE );
 
-	VIPS_ARG_BOOL( class, "squash", 14, 
-		_( "Squash" ), 
-		_( "Squash images down to 1 bit" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT,
-		G_STRUCT_OFFSET( VipsForeignSaveTiff, squash ),
-		FALSE );
-
 	VIPS_ARG_BOOL( class, "miniswhite", 14, 
 		_( "Miniswhite" ), 
 		_( "Use 0 for white in 1-bit images" ),
@@ -274,39 +271,39 @@ vips_foreign_save_tiff_class_init( VipsForeignSaveTiffClass *class )
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, miniswhite ),
 		FALSE );
 
-	VIPS_ARG_ENUM( class, "resunit", 15, 
+	VIPS_ARG_INT( class, "bitdepth", 15,
+		_( "bitdepth" ),
+		_( "Write as a 1, 2, 4 or 8 bit image" ),
+		VIPS_ARGUMENT_OPTIONAL_INPUT,
+		G_STRUCT_OFFSET( VipsForeignSaveTiff, bitdepth ),
+		0, 8, 0 );
+
+	VIPS_ARG_ENUM( class, "resunit", 16, 
 		_( "Resolution unit" ), 
 		_( "Resolution unit" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, resunit ),
 		VIPS_TYPE_FOREIGN_TIFF_RESUNIT, VIPS_FOREIGN_TIFF_RESUNIT_CM ); 
 
-	VIPS_ARG_DOUBLE( class, "xres", 16, 
+	VIPS_ARG_DOUBLE( class, "xres", 17, 
 		_( "Xres" ), 
 		_( "Horizontal resolution in pixels/mm" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, xres ),
 		0.001, 1000000, 1 );
 
-	VIPS_ARG_DOUBLE( class, "yres", 17, 
+	VIPS_ARG_DOUBLE( class, "yres", 18, 
 		_( "Yres" ), 
 		_( "Vertical resolution in pixels/mm" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, yres ),
 		0.001, 1000000, 1 );
 
-	VIPS_ARG_BOOL( class, "bigtiff", 18, 
+	VIPS_ARG_BOOL( class, "bigtiff", 19, 
 		_( "Bigtiff" ), 
 		_( "Write a bigtiff image" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, bigtiff ),
-		FALSE );
-
-	VIPS_ARG_BOOL( class, "rgbjpeg", 20, 
-		_( "RGB JPEG" ),
-		_( "Output RGB JPEG rather than YCbCr" ),
-		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED, 
-		G_STRUCT_OFFSET( VipsForeignSaveTiff, rgbjpeg ),
 		FALSE );
 
 	VIPS_ARG_BOOL( class, "properties", 21, 
@@ -351,6 +348,20 @@ vips_foreign_save_tiff_class_init( VipsForeignSaveTiffClass *class )
 		G_STRUCT_OFFSET( VipsForeignSaveTiff, subifd ),
 		FALSE );
 
+	VIPS_ARG_BOOL( class, "rgbjpeg", 20, 
+		_( "RGB JPEG" ),
+		_( "Output RGB JPEG rather than YCbCr" ),
+		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED, 
+		G_STRUCT_OFFSET( VipsForeignSaveTiff, rgbjpeg ),
+		FALSE );
+
+	VIPS_ARG_BOOL( class, "squash", 14, 
+		_( "Squash" ), 
+		_( "Squash images down to 1 bit" ),
+		VIPS_ARGUMENT_OPTIONAL_INPUT | VIPS_ARGUMENT_DEPRECATED,
+		G_STRUCT_OFFSET( VipsForeignSaveTiff, squash ),
+		FALSE );
+
 }
 
 static void
@@ -368,6 +379,7 @@ vips_foreign_save_tiff_init( VipsForeignSaveTiff *tiff )
 	tiff->level = 10;
 	tiff->lossless = FALSE;
 	tiff->depth = VIPS_FOREIGN_DZ_DEPTH_ONETILE; 
+	tiff->bitdepth = 0;
 }
 
 typedef struct _VipsForeignSaveTiffFile {
@@ -392,12 +404,19 @@ vips_foreign_save_tiff_file_build( VipsObject *object )
 		build( object ) )
 		return( -1 );
 
+        /* Handle the deprecated squash parameter.
+	 */
+        if( vips_object_argument_isset( object, "squash" ) ) 
+		/* We set that even in the case of LAB to LABQ.
+		 */
+		tiff->bitdepth = 1;
+
 	if( vips__tiff_write( save->ready, file->filename,
 		tiff->compression, tiff->Q, tiff->predictor,
 		tiff->profile,
 		tiff->tile, tiff->tile_width, tiff->tile_height,
 		tiff->pyramid,
-		tiff->squash,
+		tiff->bitdepth,
 		tiff->miniswhite,
 		tiff->resunit, tiff->xres, tiff->yres,
 		tiff->bigtiff,
@@ -470,7 +489,7 @@ vips_foreign_save_tiff_buffer_build( VipsObject *object )
 		tiff->profile,
 		tiff->tile, tiff->tile_width, tiff->tile_height,
 		tiff->pyramid,
-		tiff->squash,
+		tiff->bitdepth,
 		tiff->miniswhite,
 		tiff->resunit, tiff->xres, tiff->yres,
 		tiff->bigtiff,
@@ -484,10 +503,7 @@ vips_foreign_save_tiff_buffer_build( VipsObject *object )
 		tiff->subifd ) )
 		return( -1 );
 
-	/* vips__tiff_write_buf() makes a buffer that needs g_free(), not
-	 * vips_free().
-	 */
-	blob = vips_blob_new( (VipsCallbackFn) g_free, obuf, olen );
+	blob = vips_blob_new( (VipsCallbackFn) vips_area_free_cb, obuf, olen );
 	g_object_set( object, "buffer", blob, NULL );
 	vips_area_unref( VIPS_AREA( blob ) );
 
@@ -539,7 +555,7 @@ vips_foreign_save_tiff_buffer_init( VipsForeignSaveTiffBuffer *buffer )
  * * @tile_width: %gint for tile size
  * * @tile_height: %gint for tile size
  * * @pyramid: %gboolean, write an image pyramid
- * * @squash: %gboolean, squash 8-bit images down to 1 bit
+ * * @bitdepth: %int, change bit depth to 1,2, or 4 bit
  * * @miniswhite: %gboolean, write 1-bit images as MINISWHITE
  * * @resunit: #VipsForeignTiffResunit for resolution unit
  * * @xres: %gdouble horizontal resolution in pixels/mm
@@ -566,7 +582,7 @@ vips_foreign_save_tiff_buffer_init( VipsForeignSaveTiffBuffer *buffer )
  * can do. 
  *
  * XYZ images are automatically saved as libtiff LOGLUV with SGILOG compression.
- * Float LAB images are saved as float CIELAB. Set @squash to save as 8-bit 
+ * Float LAB images are saved as float CIELAB. Set @bitdepth to save as 8-bit 
  * CIELAB.
  *
  * Use @Q to set the JPEG compression factor. Default 75.
@@ -600,15 +616,19 @@ vips_foreign_save_tiff_buffer_init( VipsForeignSaveTiffBuffer *buffer )
  * tile. Use @depth to stop when the image fits in one pixel, or to only write
  * a single layer.
  *
- * Set @squash to make 8-bit uchar images write as 1-bit TIFFs. Values >128
- * are written as white, values <=128 as black. Normally vips will write
- * MINISBLACK TIFFs where black is a 0 bit, but if you set @miniswhite, it
- * will use 0 for a white bit. Many pre-press applications only work with
- * images which use this sense. @miniswhite only affects one-bit images, it
- * does nothing for greyscale images. 
- *
- * Set @squash to squash 3-band float CIELAB images down to 8-bit CIELAB.
- *
+ * Set @bitdepth to save 8-bit uchar images as 1, 2 or 4-bit TIFFs.
+ * In case of depth 1: Values >128 are written as white, values <=128 as black.
+ * Normally vips will write MINISBLACK TIFFs where black is a 0 bit, but if you
+ * set @miniswhite, it will use 0 for a white bit. Many pre-press applications
+ * only work with images which use this sense. @miniswhite only affects one-bit
+ * images, it does nothing for greyscale images.
+ * In case of depth 2: The same holds but values < 64 are written as black.
+ * For 64 <= values < 128 they are written as dark grey, for 128 <= values < 192
+ * they are written as light gray and values above are written as white.
+ * In case @miniswhite is set to true this behavior is inverted.
+ * In case of depth 4: values < 16 are written as black, and so on for the
+ * lighter shades. In case @miniswhite is set to true this behavior is inverted.
+ * 
  * Use @resunit to override the default resolution unit.  
  * The default 
  * resolution unit is taken from the header field 
@@ -672,7 +692,7 @@ vips_tiffsave( VipsImage *in, const char *filename, ... )
  * * @tile_width: %gint for tile size
  * * @tile_height: %gint for tile size
  * * @pyramid: %gboolean, write an image pyramid
- * * @squash: %gboolean, squash 8-bit images down to 1 bit
+ * * @bitdepth: %int, set write bit depth to 1, 2, 4 or 8
  * * @miniswhite: %gboolean, write 1-bit images as MINISWHITE
  * * @resunit: #VipsForeignTiffResunit for resolution unit
  * * @xres: %gdouble horizontal resolution in pixels/mm
