@@ -1,3 +1,4 @@
+.idea
 compile
 .pytest_cache
 a.out
@@ -9,7 +10,6 @@ tmp-*
 test/variables.sh
 libvips/introspect
 scan
-compile
 po/*.pot
 test-driver
 vips-*.tar.gz
