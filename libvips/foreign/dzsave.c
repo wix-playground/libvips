@@ -173,7 +173,13 @@
 
 #ifdef HAVE_GSF
 
+/* Disable deprecation warnings from gsf. There are loads, and still not
+ * patched as of 12/2020.
+ */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <gsf/gsf.h>
+#pragma GCC diagnostic pop
 
 /* Simple wrapper around libgsf.
  *
@@ -613,8 +619,8 @@ write_image( VipsForeignSaveDz *dz,
 	if( vips_copy( image, &t, NULL ) ) 
 		return( -1 );
 
-	/* We default to stripping all metadata. Only "no_strip" turns this
-	 * off. Very few people really want metadata on every tile.
+	/* We default to stripping all metadata. "no_strip" turns this
+	 * off. Most people don't want metadata on every tile.
 	 */
 	vips_image_set_int( t, "hide-progress", 1 );
 	if( vips_image_write_to_buffer( t, format, &buf, &len,
@@ -1049,8 +1055,8 @@ write_json( VipsForeignSaveDz *dz )
 	gsf_output_printf( out, 
 		"  \"width\": %d,\n"
 		"  \"height\": %d\n", 
-			dz->layer->image->Xsize,
-			dz->layer->image->Ysize );
+			dz->layer->width,
+			dz->layer->height );
 
 	gsf_output_printf( out, 
 		"}\n" );
@@ -1308,6 +1314,13 @@ strip_init( Strip *strip, Layer *layer )
 		VIPS_IMAGE_SIZEOF_LINE( layer->image ) * line.height,
 		line.width, line.height, 
 		layer->image->Bands, layer->image->BandFmt )) ) {
+		strip_free( strip );
+		return;
+	}
+
+	/* The strip needs to inherit the layer's metadata.
+	 */
+	if( vips__image_meta_copy( strip->image, layer->image ) ) {
 		strip_free( strip );
 		return;
 	}

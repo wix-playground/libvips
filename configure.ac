@@ -2,7 +2,7 @@
 
 # also update the version number in the m4 macros below
 
-AC_INIT([vips], [8.10.0], [vipsip@jiscmail.ac.uk])
+AC_INIT([vips], [8.11.0], [vipsip@jiscmail.ac.uk])
 # required for gobject-introspection
 AC_PREREQ(2.62)
 
@@ -17,7 +17,7 @@ AC_CONFIG_MACRO_DIR([m4])
 
 # user-visible library versioning
 m4_define([vips_major_version], [8])
-m4_define([vips_minor_version], [10])
+m4_define([vips_minor_version], [11])
 m4_define([vips_micro_version], [0])
 m4_define([vips_version],
           [vips_major_version.vips_minor_version.vips_micro_version])
@@ -37,9 +37,9 @@ VIPS_VERSION_STRING=$VIPS_VERSION-`date -u -r $srcdir/ChangeLog`
 #   binary interface changes backwards compatible?: increment age
 #   binary interface changes not backwards compatible?: reset age to 0
 
-LIBRARY_CURRENT=54
-LIBRARY_REVISION=3
-LIBRARY_AGE=12
+LIBRARY_CURRENT=55
+LIBRARY_REVISION=0
+LIBRARY_AGE=13
 
 # patched into include/vips/version.h
 AC_SUBST(VIPS_VERSION)
@@ -239,6 +239,20 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AM_WITH_DMALLOC
 
+AC_ARG_WITH([doxygen], 
+  AS_HELP_STRING([--without-doxygen], [build without doxygen (default: test)]))
+
+if test x"$with_doxygen" != x"no"; then
+  AC_CHECK_PROGS([DOXYGEN], [doxygen])
+  if test "$DOXYGEN"; then
+    with_doxygen=yes
+  else
+    AC_MSG_WARN([doxygen not found; C++ docs will not be generated])
+    with_doxygen=no
+  fi
+fi
+AM_CONDITIONAL([HAVE_DOXYGEN], [test -n "$DOXYGEN"])
+
 # we need a fully expanded version of $libdir
 # without this we get something like
 #    define VIPS_LIBDIR ${exec_prefix}/lib
@@ -248,11 +262,11 @@ test x"$exec_prefix" = x"NONE" && exec_prefix='${prefix}'
 
 # set $expanded_value to the fully-expanded value of the argument
 expand () {
-	eval expanded_value=$1
+    eval expanded_value=$1
 
-	if test x"$expanded_value" != x"$1"; then
-		expand "$expanded_value"
-	fi
+    if test x"$expanded_value" != x"$1"; then
+        expand "$expanded_value"
+    fi
 }
 
 expand $libdir
@@ -834,7 +848,7 @@ AC_ARG_WITH([heif],
   AS_HELP_STRING([--without-heif], [build without libheif (default: test)]))
 
 if test x"$with_heif" != x"no"; then
-  PKG_CHECK_MODULES(HEIF, libheif,
+  PKG_CHECK_MODULES(HEIF, libheif >= 1.3.0,
     [with_heif=yes
      have_h265_decoder=`$PKG_CONFIG libheif --variable builtin_h265_decoder`
      have_avif_decoder=`$PKG_CONFIG libheif --variable builtin_avif_decoder`
@@ -852,7 +866,7 @@ if test x"$with_heif" != x"no"; then
      fi
      PACKAGES_USED="$PACKAGES_USED libheif"
     ],
-    [AC_MSG_WARN([libheif not found; disabling HEIF support])
+    [AC_MSG_WARN([libheif >= 1.3.0 not found; disabling HEIF support])
      with_heif=no
      have_h265_decoder=
      have_h265_encoder=
@@ -860,42 +874,6 @@ if test x"$with_heif" != x"no"; then
      have_avif_encoder=
     ]
   )
-fi
-
-# heif_context_set_primary_image not in 1.1
-if test x"$with_heif" = x"yes"; then
-  save_LIBS="$LIBS"
-  LIBS="$LIBS $HEIF_LIBS"
-  AC_CHECK_FUNCS(heif_context_set_primary_image,[
-     AC_DEFINE(HAVE_HEIF_CONTEXT_SET_PRIMARY_IMAGE,1,
-	       [define if you have heif_context_set_primary_image.])
-   ],[]
-  )
-  LIBS="$save_LIBS"
-fi
-
-# heif_encoding_options_alloc not in 1.1
-if test x"$with_heif" = x"yes"; then
-  save_LIBS="$LIBS"
-  LIBS="$LIBS $HEIF_LIBS"
-  AC_CHECK_FUNCS(heif_encoding_options_alloc,[
-     AC_DEFINE(HAVE_HEIF_ENCODING_OPTIONS_ALLOC,1,
-	       [define if you have heif_encoding_options_alloc.])
-   ],[]
-  )
-  LIBS="$save_LIBS"
-fi
-
-# exif/xmp profile support not in 1.1
-if test x"$with_heif" = x"yes"; then
-  save_LIBS="$LIBS"
-  LIBS="$LIBS $HEIF_LIBS"
-  AC_CHECK_FUNCS(heif_context_add_exif_metadata,[
-     AC_DEFINE(HAVE_HEIF_CONTEXT_ADD_EXIF_METADATA,1,
-	       [define if you have heif_context_add_exif_metadata.])
-   ],[]
-  )
-  LIBS="$save_LIBS"
 fi
 
 # color profile support added in 1.3.3
@@ -908,6 +886,15 @@ if test x"$with_heif" = x"yes"; then
    ],[]
   )
   LIBS="$save_LIBS"
+fi
+
+# heif_main_brand added in 1.4.0, but heif_avif appeared in 1.7 ... just check
+# the libheif version number since testing for enums is annoying
+if test x"$with_heif" = x"yes"; then
+  PKG_CHECK_MODULES(HEIF_AVIF, libheif >= 1.7.0, [
+    AC_DEFINE(HAVE_HEIF_AVIF,1,[define if you have heif_avif.])
+  ], [
+  ])
 fi
 
 # heif_decoding_options.convert_hdr_to_8bit added in 1.7.0
@@ -926,18 +913,20 @@ fi
 AC_ARG_WITH([pdfium],
   AS_HELP_STRING([--without-pdfium], [build without pdfium (default: test)]))
 
+# pick 4200 as the starting version number ... no reason, really, it'd
+# probably work with much older versions
 if test x"$with_pdfium" != x"no"; then
-  FIND_PDFIUM([
-     if test x"$with_poppler" != x"no"; then
-       AC_MSG_WARN([PDFium found, disabling poppler])
-       with_poppler=no
-     fi
-     EXTRA_LIBS_USED="$EXTRA_LIBS_USED $PDFIUM_LIBS"
-     with_pdfium=yes
-    ],[
-     with_pdfium=no
-    ]
-  )
+  PKG_CHECK_MODULES(PDFIUM, pdfium >= 4200, [
+    AC_DEFINE(HAVE_PDFIUM,1,[define if you have pdfium > 4200.])
+    if test x"$with_poppler" != x"no"; then
+      AC_MSG_WARN([PDFium found, disabling poppler])
+      with_poppler=no
+    fi
+    with_pdfium=yes
+    PACKAGES_USED="$PACKAGES_USED pdfium"
+  ], [
+    with_pdfium=no
+  ])
 fi
 
 # poppler
@@ -945,15 +934,14 @@ AC_ARG_WITH([poppler],
   AS_HELP_STRING([--without-poppler], [build without poppler (default: test)]))
 
 if test x"$with_poppler" != x"no"; then
-  PKG_CHECK_MODULES(POPPLER, [poppler-glib >= 0.16.0 cairo >= 1.2],
-    [AC_DEFINE(HAVE_POPPLER,1,[define if you have poppler-glib >= 0.16.0 and cairo >= 1.2 installed.])
-     with_poppler=yes
-     PACKAGES_USED="$PACKAGES_USED poppler-glib cairo"
-    ],
-    [AC_MSG_WARN([poppler-glib >= 0.16.0 or cairo >= 1.2 not found; disabling PDF load via poppler])
-     with_poppler=no
-    ]
-  )
+  PKG_CHECK_MODULES(POPPLER, [poppler-glib >= 0.16.0 cairo >= 1.2], [
+    AC_DEFINE(HAVE_POPPLER,1,[define if you have poppler-glib >= 0.16.0 and cairo >= 1.2 installed.])
+    with_poppler=yes
+    PACKAGES_USED="$PACKAGES_USED poppler-glib cairo"
+  ], [
+    AC_MSG_WARN([poppler-glib >= 0.16.0 or cairo >= 1.2 not found; disabling PDF load via poppler])
+    with_poppler=no
+  ])
 fi
 
 # librsvg
@@ -962,15 +950,14 @@ AC_ARG_WITH([rsvg],
 
 # 2.40.3 so we get the UNLIMITED open flag
 if test x"$with_rsvg" != x"no"; then
-  PKG_CHECK_MODULES(RSVG, [librsvg-2.0 >= 2.40.3 cairo >= 1.2],
-    [AC_DEFINE(HAVE_RSVG,1,[define if you have librsvg-2.0 >= 2.40.3 and cairo >= 1.2 installed.])
-     with_rsvg=yes
-     PACKAGES_USED="$PACKAGES_USED librsvg-2.0 cairo"
-    ],
-    [AC_MSG_WARN([librsvg-2.0 >= 2.40.3 or cairo >= 1.2 not found; disabling SVG load via rsvg])
-     with_rsvg=no
-    ]
-  )
+  PKG_CHECK_MODULES(RSVG, [librsvg-2.0 >= 2.40.3 cairo >= 1.2], [
+    AC_DEFINE(HAVE_RSVG,1,[define if you have librsvg-2.0 >= 2.40.3 and cairo >= 1.2 installed.])
+    with_rsvg=yes
+    PACKAGES_USED="$PACKAGES_USED librsvg-2.0 cairo"
+  ], [
+    AC_MSG_WARN([librsvg-2.0 >= 2.40.3 or cairo >= 1.2 not found; disabling SVG load via rsvg])
+    with_rsvg=no
+  ])
 fi
 
 # zlib
@@ -1162,21 +1149,31 @@ FIND_GIFLIB(
 )
 
 # Look for libspng first
+# 0.6.1 uses "libspng.pc", git master libspng uses "spng.pc"
 AC_ARG_WITH([libspng], 
   AS_HELP_STRING([--without-libspng], [build without libspng (default: test)]))
 
 if test x"$with_libspng" != x"no"; then
-  PKG_CHECK_MODULES(SPNG, spng >= 0.6,
+  PKG_CHECK_MODULES(SPNG, libspng >= 0.6,
     [AC_DEFINE(HAVE_SPNG,1,[define if you have libspng installed.])
      with_libspng=yes
-     PACKAGES_USED="$PACKAGES_USED spng"
+     PACKAGES_USED="$PACKAGES_USED libspng"
     ],
-    [with_libspng=no
+    [PKG_CHECK_MODULES(SPNG, spng >= 0.6,
+      [AC_DEFINE(HAVE_SPNG,1,[define if you have libspng installed.])
+       with_libspng=yes
+       PACKAGES_USED="$PACKAGES_USED spng"
+      ],
+      [with_libspng=no
+      ]
+     )
     ]
   )
 fi
 
 # look for PNG with pkg-config ... fall back to our tester
+# we can have both PNG and SPNG enabled, with SPNG for read and PNG for
+# write
 AC_ARG_WITH([png], 
   AS_HELP_STRING([--without-png], [build without libpng (default: test)]))
 
@@ -1299,14 +1296,13 @@ if test x"$LIB_FUZZING_ENGINE" = x; then
 fi
 
 # Gather all up for VIPS_CFLAGS, VIPS_INCLUDES, VIPS_LIBS
-VIPS_CFLAGS="$VIPS_CFLAGS $GTHREAD_CFLAGS $GIO_CFLAGS $REQUIRED_CFLAGS $EXPAT_CFLAGS $ZLIB_CFLAGS $PANGOFT2_CFLAGS $GSF_CFLAGS $FFTW_CFLAGS $MAGICK_CFLAGS $JPEG_CFLAGS $SPNG_CFLAGS $PNG_CFLAGS $IMAGEQUANT_CFLAGS $EXIF_CFLAGS $MATIO_CFLAGS $CFITSIO_CFLAGS $LIBWEBP_CFLAGS $LIBWEBPMUX_CFLAGS $GIFLIB_INCLUDES $RSVG_CFLAGS $PDFIUM_INCLUDES $POPPLER_CFLAGS $OPENEXR_CFLAGS $OPENSLIDE_CFLAGS $ORC_CFLAGS $TIFF_CFLAGS $LCMS_CFLAGS $HEIF_CFLAGS"
-VIPS_CFLAGS="$VIPS_DEBUG_FLAGS $VIPS_CFLAGS"
+VIPS_CFLAGS="$VIPS_CFLAGS $GTHREAD_CFLAGS $GIO_CFLAGS $REQUIRED_CFLAGS $EXPAT_CFLAGS $ZLIB_CFLAGS $PANGOFT2_CFLAGS $GSF_CFLAGS $FFTW_CFLAGS $MAGICK_CFLAGS $JPEG_CFLAGS $SPNG_CFLAGS $PNG_CFLAGS $IMAGEQUANT_CFLAGS $EXIF_CFLAGS $MATIO_CFLAGS $CFITSIO_CFLAGS $LIBWEBP_CFLAGS $LIBWEBPMUX_CFLAGS $GIFLIB_INCLUDES $RSVG_CFLAGS $PDFIUM_CFLAGS $POPPLER_CFLAGS $OPENEXR_CFLAGS $OPENSLIDE_CFLAGS $ORC_CFLAGS $TIFF_CFLAGS $LCMS_CFLAGS $HEIF_CFLAGS" VIPS_CFLAGS="$VIPS_DEBUG_FLAGS $VIPS_CFLAGS"
 VIPS_INCLUDES="$ZLIB_INCLUDES $PNG_INCLUDES $TIFF_INCLUDES $JPEG_INCLUDES $NIFTI_INCLUDES" 
 VIPS_LIBS="$ZLIB_LIBS $HEIF_LIBS $MAGICK_LIBS $SPNG_LIBS $PNG_LIBS $IMAGEQUANT_LIBS $TIFF_LIBS $JPEG_LIBS $GTHREAD_LIBS $GIO_LIBS $REQUIRED_LIBS $EXPAT_LIBS $PANGOFT2_LIBS $GSF_LIBS $FFTW_LIBS $ORC_LIBS $LCMS_LIBS $GIFLIB_LIBS $RSVG_LIBS $NIFTI_LIBS $PDFIUM_LIBS $POPPLER_LIBS $OPENEXR_LIBS $OPENSLIDE_LIBS $CFITSIO_LIBS $LIBWEBP_LIBS $LIBWEBPMUX_LIBS $MATIO_LIBS $EXIF_LIBS -lm"
 
 # autoconf hates multi-line AC_SUBST so we have to have another copy of this
 # thing
-VIPS_CONFIG="native win32: $vips_os_win32, native OS X: $vips_os_darwin, open files in binary mode: $vips_binary_open, enable debug: $enable_debug, enable deprecated library components: $enable_deprecated, enable docs with gtkdoc: $enable_gtk_doc, gobject introspection: $found_introspection, enable radiance support: $with_radiance, enable analyze support: $with_analyze, enable PPM support: $with_ppm, use fftw3 for FFT: $with_fftw, Magick package: $with_magickpackage, Magick API version: $magick_version, load with libMagick: $enable_magickload, save with libMagick: $enable_magicksave, accelerate loops with orc: $with_orc, ICC profile support with lcms: $with_lcms, file import with niftiio: $with_nifti, file import with libheif: $with_heif, file import with OpenEXR: $with_OpenEXR, file import with OpenSlide: $with_openslide, file import with matio: $with_matio, PDF import with PDFium: $with_pdfium, PDF import with poppler-glib: $with_poppler, SVG import with librsvg-2.0: $with_rsvg, zlib: $with_zlib, file import with cfitsio: $with_cfitsio, file import/export with libwebp: $with_libwebp, text rendering with pangoft2: $with_pangoft2, file import/export with libspng: $with_libspng, file import/export with libpng: $with_png, support 8bpp PNG quantisation: $with_imagequant, file import/export with libtiff: $with_tiff, file import/export with giflib: $with_giflib, file import/export with libjpeg: $with_jpeg, image pyramid export: $with_gsf, use libexif to load/save JPEG metadata: $with_libexif"
+VIPS_CONFIG="native win32: $vips_os_win32, native OS X: $vips_os_darwin, open files in binary mode: $vips_binary_open, enable debug: $enable_debug, enable deprecated library components: $enable_deprecated, enable docs with gtkdoc: $enable_gtk_doc, gobject introspection: $found_introspection, enable radiance support: $with_radiance, enable analyze support: $with_analyze, enable PPM support: $with_ppm, generate C++ docs: $with_doxygen, use fftw3 for FFT: $with_fftw, Magick package: $with_magickpackage, Magick API version: $magick_version, load with libMagick: $enable_magickload, save with libMagick: $enable_magicksave, accelerate loops with orc: $with_orc, ICC profile support with lcms: $with_lcms, file import with niftiio: $with_nifti, file import with libheif: $with_heif, file import with OpenEXR: $with_OpenEXR, file import with OpenSlide: $with_openslide, file import with matio: $with_matio, PDF import with PDFium: $with_pdfium, PDF import with poppler-glib: $with_poppler, SVG import with librsvg-2.0: $with_rsvg, zlib: $with_zlib, file import with cfitsio: $with_cfitsio, file import/export with libwebp: $with_libwebp, text rendering with pangoft2: $with_pangoft2, file import/export with libspng: $with_libspng, file import/export with libpng: $with_png, support 8bpp PNG quantisation: $with_imagequant, file import/export with libtiff: $with_tiff, file import/export with giflib: $with_giflib, file import/export with libjpeg: $with_jpeg, image pyramid export: $with_gsf, use libexif to load/save JPEG metadata: $with_libexif"
 
 AC_SUBST(VIPS_LIBDIR)
 
@@ -1345,6 +1341,7 @@ AC_CONFIG_FILES([
 	libvips/mosaicing/Makefile
 	libvips/create/Makefile
 	libvips/resample/Makefile
+	cplusplus/Doxyfile
 	cplusplus/include/Makefile
 	cplusplus/include/vips/Makefile
 	cplusplus/Makefile
@@ -1379,6 +1376,7 @@ gobject introspection: 			$found_introspection
 enable radiance support: 		$with_radiance
 enable analyze support: 		$with_analyze
 enable PPM support: 			$with_ppm
+generate C++ docs:                      $with_doxygen
 
 * optional dependencies
 use fftw3 for FFT: 			$with_fftw

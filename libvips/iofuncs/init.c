@@ -90,8 +90,14 @@
 #include <limits.h>
 #include <string.h>
 
+/* Disable deprecation warnings from gsf. There are loads, and still not
+ * patched as of 12/2020.
+ */
 #ifdef HAVE_GSF
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <gsf/gsf.h>
+#pragma GCC diagnostic pop
 #endif /*HAVE_GSF*/
 
 #include <vips/vips.h>
@@ -284,6 +290,24 @@ empty_log_handler( const gchar *log_domain, GLogLevelFlags log_level,
 {       
 }
 
+#if !GLIB_CHECK_VERSION( 2, 31, 0 )
+static void
+default_log_handler( const gchar *log_domain, GLogLevelFlags log_level,
+	const gchar *message, gpointer user_data )
+{
+	if( log_level & (G_LOG_LEVEL_DEBUG | G_LOG_LEVEL_INFO) ) {
+		const char *domains = g_getenv( "G_MESSAGES_DEBUG" );
+
+		if( !domains || 
+			(!g_str_equal( domains, "all" ) &&
+			 !g_strrstr( domains, log_domain )) ) 
+	  		return;
+	}
+
+	g_log_default_handler( log_domain, log_level, message, user_data );
+}
+#endif /*!GLIB_CHECK_VERSION( 2, 31, 0 )*/
+
 /* Attempt to set a minimum stacksize. This can be important on systems with a
  * very low default, like musl.
  */
@@ -318,17 +342,12 @@ set_stacksize( guint64 size )
 static void
 vips_verbose( void ) 
 {
-	/* Older glibs were showing G_LOG_LEVEL_{INFO,DEBUG} messages
-	 * by default
-	 */
-#if GLIB_CHECK_VERSION ( 2, 31, 0 )
 	const char *old;
 
 	old = g_getenv( "G_MESSAGES_DEBUG" );
 
-	if( !old ) {
+	if( !old ) 
 		g_setenv( "G_MESSAGES_DEBUG", G_LOG_DOMAIN, TRUE );
-	}
 	else if( !g_str_equal( old, "all" ) &&
 		!g_strrstr( old, G_LOG_DOMAIN ) ) {
 		char *new;
@@ -338,7 +357,6 @@ vips_verbose( void )
 
 		g_free( new );
 	}
-#endif /*GLIB_CHECK_VERSION( 2, 31, 0 )*/
 }
 
 /**
@@ -413,7 +431,6 @@ vips_init( const char *argv0 )
 #endif /*HAVE_THREAD_NEW*/
 
 	vips__threadpool_init();
-	vips__sink_screen_init();
 	vips__buffer_init();
 	vips__meta_init();
 
@@ -590,6 +607,18 @@ vips_init( const char *argv0 )
 #endif
 		g_log_set_handler( G_LOG_DOMAIN, G_LOG_LEVEL_WARNING, 
 			empty_log_handler, NULL );
+
+#if !GLIB_CHECK_VERSION( 2, 31, 0 )
+	/* Older glibs can sometimes show G_LOG_LEVEL_{INFO,DEBUG} messages.
+	 * Block them ourselves. We test the env var inside the handler since
+	 * vips_verbose() can be toggled at runtime.
+	 *
+	 * Again, we should not call g_log_set_handler(), but this is the only
+	 * convenient way to fix this behaviour.
+	 */
+	g_log_set_handler( G_LOG_DOMAIN, G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG, 
+		default_log_handler, NULL );
+#endif /*!GLIB_CHECK_VERSION( 2, 31, 0 )*/
 
 	/* Set a minimum stacksize, if we can.
 	 */

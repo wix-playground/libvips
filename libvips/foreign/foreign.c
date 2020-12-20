@@ -1336,8 +1336,7 @@ vips__foreign_convert_saveable( VipsImage *in, VipsImage **ready,
 	}
 
 	/* If this image is CMYK and the saver is RGB-only, use lcms to try to
-	 * import to XYZ. This will only work if the image has an embedded
-	 * profile. 
+	 * import to XYZ. 
 	 */
 	if( in->Type == VIPS_INTERPRETATION_CMYK &&
 		in->Bands >= 4 &&
@@ -1348,6 +1347,8 @@ vips__foreign_convert_saveable( VipsImage *in, VipsImage **ready,
 
 		if( vips_icc_import( in, &out, 
 			"pcs", VIPS_PCS_XYZ,
+			"embedded", TRUE,
+			"input_profile", "cmyk",
 			NULL ) ) {
 			g_object_unref( in );
 			return( -1 );
@@ -2173,7 +2174,7 @@ vips_foreign_operation_init( void )
 	vips_foreign_save_rad_target_get_type(); 
 #endif /*HAVE_RADIANCE*/
 
-#if defined(HAVE_POPPLER)
+#ifdef HAVE_POPPLER
 	vips_foreign_load_pdf_file_get_type(); 
 	vips_foreign_load_pdf_buffer_get_type(); 
 	vips_foreign_load_pdf_source_get_type(); 
@@ -2182,6 +2183,7 @@ vips_foreign_operation_init( void )
 #ifdef HAVE_PDFIUM
 	vips_foreign_load_pdf_file_get_type(); 
 	vips_foreign_load_pdf_buffer_get_type(); 
+	vips_foreign_load_pdf_source_get_type(); 
 #endif /*HAVE_PDFIUM*/
 
 #ifdef HAVE_RSVG

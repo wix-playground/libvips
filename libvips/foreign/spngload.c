@@ -94,13 +94,18 @@ vips_foreign_load_png_stream( spng_ctx *ctx, void *user,
 {
 	VipsSource *source = VIPS_SOURCE( user );
 
-	gint64 bytes_read;
+	while( length > 0 ) {
+		gint64 bytes_read;
 
-	bytes_read = vips_source_read( source, dest, length );
-	if( bytes_read < 0 )
-		return( SPNG_IO_ERROR );
-	if( bytes_read < length )
-		return( SPNG_IO_EOF);
+		bytes_read = vips_source_read( source, dest, length );
+		if( bytes_read < 0 )
+			return( SPNG_IO_ERROR );
+		if( bytes_read == 0 )
+			return( SPNG_IO_EOF );
+
+		dest += bytes_read;
+		length -= bytes_read;
+	}
 
 	return( 0 );
 }
@@ -303,7 +308,8 @@ vips_foreign_load_png_header( VipsForeignLoad *load )
 		return( -1 );
 	}
 
-	/*
+
+#ifdef DEBUG
 	printf( "width: %d\nheight: %d\nbit depth: %d\ncolor type: %d\n",
 		png->ihdr.width, png->ihdr.height,
 		png->ihdr.bit_depth, png->ihdr.color_type );
@@ -311,7 +317,7 @@ vips_foreign_load_png_header( VipsForeignLoad *load )
 		"interlace method: %d\n",
 		png->ihdr.compression_method, png->ihdr.filter_method,
 		png->ihdr.interlace_method );
-	 */
+#endif /*DEBUG*/
 
 	/* Just convert to host-endian if nothing else applies.
 	 */ 

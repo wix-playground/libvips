@@ -714,8 +714,11 @@ vips__png_header_source( VipsSource *source, VipsImage *out )
 	Read *read;
 
 	if( !(read = read_new( source, out, TRUE )) ||
-		png2vips_header( read, out ) )
+		png2vips_header( read, out ) ) {
+		vips_error( "png2vips", _( "unable to read source %s" ),
+			vips_connection_nick( VIPS_CONNECTION( source ) ) );
 		return( -1 );
+	}
 
 	vips_source_minimise( source );
 
@@ -729,8 +732,11 @@ vips__png_read_source( VipsSource *source, VipsImage *out, gboolean fail )
 
 	if( !(read = read_new( source, out, fail )) ||
 		png2vips_image( read, out ) ||
-		vips_source_decode( source ) )
+		vips_source_decode( source ) ) {
+		vips_error( "png2vips", _( "unable to read source %s" ),
+			vips_connection_nick( VIPS_CONNECTION( source ) ) );
 		return( -1 );
+	}
 
 	return( 0 );
 }
@@ -1186,6 +1192,8 @@ write_vips( Write *write,
 
 	png_write_end( write->pPng, write->pInfo );
 
+	vips_target_finish( write->target );
+
 	return( 0 );
 }
 
@@ -1205,8 +1213,8 @@ vips__png_write_target( VipsImage *in, VipsTarget *target,
 		compression, interlace, profile, filter, strip, palette,
 		Q, dither, bitdepth ) ) {
 		write_finish( write );
-		vips_error( "vips2png", 
-			"%s", _( "unable to write to target" ) );
+		vips_error( "vips2png", _( "unable to write to target %s" ),
+			vips_connection_nick( VIPS_CONNECTION( target ) ) );
 		return( -1 );
 	}
 
