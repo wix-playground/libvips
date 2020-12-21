@@ -351,20 +351,36 @@ vips_foreign_load_gif_close_giflib( VipsForeignLoadGif *gif )
 
 /* Callback from the gif loader.
  *
- * Read up to len bytes into buffer, return number of bytes read, 0 for EOF.
+ * Read up to len bytes into buffer, return number of bytes read. This is
+ * called by giflib exactly as fread, so it does not distinguish between EOF
+ * and read error.
  */
 static int
 vips_giflib_read( GifFileType *file, GifByteType *buf, int n )
 {
 	VipsForeignLoadGif *gif = (VipsForeignLoadGif *) file->UserData;
 
-	gint64 read;
+	int to_read;
 
-	read = vips_source_read( gif->source, buf, n );
-	if( read == 0 )
-		gif->eof = TRUE;
+	to_read = n;
+	while( to_read > 0 ) {
+		gint64 bytes_read;
 
-	return( (int) read );
+		bytes_read = vips_source_read( gif->source, buf, n );
+		if( bytes_read == 0 ) {
+			gif->eof = TRUE;
+			return( -1 );
+		}
+		if( bytes_read < 0 )
+			return( -1 );
+		if( bytes_read > INT_MAX ) 
+			return( -1 );
+
+		to_read -= bytes_read;
+		buf += bytes_read;
+	}
+
+	return( (int) n );
 }
 
 /* Open any underlying file resource, then giflib.
@@ -684,8 +700,16 @@ vips_foreign_load_gif_scan_extension( VipsForeignLoadGif *gif )
 static int
 vips_foreign_load_gif_set_header( VipsForeignLoadGif *gif, VipsImage *image )
 {
+	const gint64 total_height = (gint64) gif->file->SHeight * gif->n;
+
+	if( total_height <= 0 || 
+		total_height > VIPS_MAX_COORD ) {
+		vips_error( "gifload", "%s", _( "image size out of bounds" ) );
+		return( -1 );
+	}
+
 	vips_image_init_fields( image,
-		gif->file->SWidth, gif->file->SHeight * gif->n,
+		gif->file->SWidth, total_height,
 		(gif->has_colour ? 3 : 1) + (gif->has_transparency ? 1 : 0),
 		VIPS_FORMAT_UCHAR, VIPS_CODING_NONE,
 		gif->has_colour ?

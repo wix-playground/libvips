@@ -8,6 +8,10 @@
  * 	- add "bitdepth" param, cf. tiffsave
  * 27/6/20
  * 	- add ppmsave_target
+ * 20/11/20
+ * 	- byteswap on save, if necessary [ewelot]
+ * 2/12/20
+ * 	- don't add date with @strip [ewelot]
  */
 
 /*
@@ -62,7 +66,7 @@ typedef struct _VipsForeignSavePpm VipsForeignSavePpm;
 
 typedef int (*VipsSavePpmFn)( VipsForeignSavePpm *, VipsImage *, VipsPel * );
 
-typedef struct _VipsForeignSavePpm {
+struct _VipsForeignSavePpm {
 	VipsForeignSave parent_object;
 
 	VipsTarget *target;
@@ -74,7 +78,7 @@ typedef struct _VipsForeignSavePpm {
 	/* Deprecated.
 	 */
 	gboolean squash;
-} VipsForeignSavePpm;
+};
 
 typedef VipsForeignSaveClass VipsForeignSavePpmClass;
 
@@ -210,6 +214,8 @@ vips_foreign_save_ppm_block( VipsRegion *region, VipsRect *area, void *a )
 static int
 vips_foreign_save_ppm( VipsForeignSavePpm *ppm, VipsImage *image )
 {
+	VipsForeignSave *save = (VipsForeignSave *) ppm;
+
 	char *magic;
 	char *date;
 
@@ -244,10 +250,12 @@ vips_foreign_save_ppm( VipsForeignSavePpm *ppm, VipsImage *image )
 		g_assert_not_reached();
 
 	vips_target_writef( ppm->target, "%s\n", magic );
-	date = vips__get_iso8601();
-	vips_target_writef( ppm->target, 
-		"#vips2ppm - %s\n", date );
-	g_free( date );
+	if( !save->strip ) {
+		date = vips__get_iso8601();
+		vips_target_writef( ppm->target, 
+			"#vips2ppm - %s\n", date );
+		g_free( date );
+	}
 	vips_target_writef( ppm->target, 
 		"%d %d\n", image->Xsize, image->Ysize );
 
@@ -298,8 +306,23 @@ vips_foreign_save_ppm( VipsForeignSavePpm *ppm, VipsImage *image )
 			vips_foreign_save_ppm_line_ascii : 
 			vips_foreign_save_ppm_line_binary;
 
+	/* 16 and 32-bit binary write might need byteswapping.
+	 */
+	if( !ppm->ascii &&
+		(image->BandFmt == VIPS_FORMAT_USHORT ||
+		 image->BandFmt == VIPS_FORMAT_UINT) ) {
+		VipsImage *x;
+
+		if( vips__byteswap_bool( image, &x, !vips_amiMSBfirst() ) )
+			return( -1 );
+		VIPS_UNREF( image );
+		image = x;
+	}
+
 	if( vips_sink_disc( image, vips_foreign_save_ppm_block, ppm ) )
 		return( -1 );
+
+	vips_target_finish( ppm->target );
 
 	return( 0 );
 }
@@ -400,7 +423,7 @@ vips_foreign_save_ppm_class_init( VipsForeignSavePpmClass *class )
 
 	VIPS_ARG_INT( class, "bitdepth", 15,
 		_( "bitdepth" ),
-		_( "Write as a 1 bit image" ),
+		_( "set to 1 to write as a 1 bit image" ),
 		VIPS_ARGUMENT_OPTIONAL_INPUT,
 		G_STRUCT_OFFSET( VipsForeignSavePpm, bitdepth ),
 		0, 1, 0 );

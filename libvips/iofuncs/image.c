@@ -859,10 +859,7 @@ vips_image_build( VipsObject *object )
 		if( (magic = vips__file_magic( filename )) ) {
 			/* We may need to byteswap.
 			 */
-			guint32 us = vips_amiMSBfirst() ? 
-				VIPS_MAGIC_INTEL : VIPS_MAGIC_SPARC;
-
-			if( magic == us ) {
+			if( GUINT_FROM_BE( magic ) == image->magic ) {
 				/* Native open.
 				 */
 				if( vips_image_open_input( image ) )
@@ -3870,6 +3867,20 @@ vips_band_format_iscomplex( VipsBandFormat format )
 		g_assert_not_reached();
 		return( FALSE );
 	}
+}
+
+/**
+ * vips_image_free_buffer:
+ * @image: the image that contains the buffer
+ * @buffer: the orignal buffer that was stolen
+ *
+ * Free the externally allocated buffer found in the input image. This function
+ * is intended to be used with g_signal_connect.
+ */
+void
+vips_image_free_buffer( VipsImage *image, void *buffer )
+{
+	free( buffer );
 }
 
 /* Handy for debugging: view an image in nip2.

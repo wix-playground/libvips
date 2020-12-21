@@ -39,6 +39,8 @@
  * 	- ban max_vaue < 0 
  * 27/6/20
  * 	- add ppmload_source
+ * 22/11/20
+ * 	- fix msb_first default [ewelot]
  */
 
 /*
@@ -254,7 +256,7 @@ vips_foreign_load_ppm_parse_header( VipsForeignLoadPpm *ppm )
 
 	/* Default ... can be changed below for PFM images.
 	 */
-	ppm->msb_first = 0;
+	ppm->msb_first = 1;
 
 	/* Read in size.
 	 */
@@ -458,13 +460,24 @@ vips_foreign_load_ppm_generate_binary( VipsRegion *or,
 	for( y = 0; y < r->height; y++ ) {
 		VipsPel *q = VIPS_REGION_ADDR( or, 0, r->top + y );
 
-		size_t bytes_read;
+		size_t n_bytes;
 
-		bytes_read = vips_source_read( ppm->source, q, sizeof_line );
-		if( bytes_read != sizeof_line ) {
-			vips_error( class->nickname, 
-				"%s", _( "file truncated" ) );
-			return( -1 );
+		n_bytes = sizeof_line;
+		while( n_bytes > 0 ) {
+			gint64 bytes_read;
+
+			bytes_read = vips_source_read( ppm->source, 
+				q, sizeof_line );
+			if( bytes_read < 0 ) 
+				return( -1 );
+			if( bytes_read == 0 ) {
+				vips_error( class->nickname, 
+					"%s", _( "file truncated" ) );
+				return( -1 );
+			}
+
+			n_bytes -= bytes_read;
+			q += bytes_read;
 		}
 	}
 
@@ -773,12 +786,15 @@ vips_foreign_load_ppm_source_class_init( VipsForeignLoadPpmFileClass *class )
 {
 	GObjectClass *gobject_class = G_OBJECT_CLASS( class );
 	VipsObjectClass *object_class = (VipsObjectClass *) class;
+	VipsForeignLoadClass *load_class = (VipsForeignLoadClass *) class;
 
 	gobject_class->set_property = vips_object_set_property;
 	gobject_class->get_property = vips_object_get_property;
 
 	object_class->nickname = "ppmload_source";
 	object_class->build = vips_foreign_load_ppm_source_build;
+
+	load_class->is_a_source = vips_foreign_load_ppm_is_a_source;
 
 	VIPS_ARG_OBJECT( class, "source", 1,
 		_( "Source" ),
